@@ -1,0 +1,36 @@
+dataset_id: death_record_sinadef_normalized
+table_name: death_record_normalized
+primary_key: [death_id]
+
+required_columns:
+  death_id: character
+  year_id: integer
+  sex_id: integer
+  age: integer
+  location_id: integer
+  icd10_ucod: character
+  source_dataset: character
+  run_id: character
+
+constraints:
+  death_id: {allow_na: false}
+  year_id: {allow_na: false, min: 2018, max: 2024}
+  sex_id: {allow_na: false, allowed_values: [8507, 8532]}
+  age: {allow_na: false, min: 0, max: 110}
+  location_id: {allow_na: false}
+  icd10_ucod: {allow_na: false}
+  source_dataset: {allow_na: false}
+  run_id: {allow_na: false}
+
+dictionary:
+  death_id: {label: "Identificador único de defunción"}
+  year_id: {label: "Año calendario de defunción"}
+  sex_id:
+    label: "Identificador OMOP-like de sexo"
+    omop_domain_id: "Gender"
+    is_omop_concept_id: true
+  age: {label: "Edad simple en años cumplidos", units: "years"}
+  location_id: {label: "Identificador geográfico armonizado"}
+  icd10_ucod: {label: "Código CIE-10 armonizado de causa básica"}
+  source_dataset: {label: "Dataset fuente"}
+  run_id: {label: "Identificador de corrida"}

@@ -1,0 +1,190 @@
+# ============================================================
+# .gitignore recomendado para mortalidad-causa-especifica
+# Estrategia:
+# - excluir por defecto datos derivados, outputs y datos sensibles
+# - permitir explícitamente insumos públicos/versionables
+# - proteger SINADEF individual y cualquier derivado sensible
+# ============================================================
+
+# ============================================================
+# 1. DATOS DERIVADOS Y OUTPUTS (EXCLUIR)
+# ============================================================
+/data/final/
+/data/derived/
+/outputs/
+/data/_catalog/
+
+# ============================================================
+# 2. DATA RAW: EXCLUIR POR DEFECTO Y REABRIR SOLO LO PÚBLICO
+# ============================================================
+/data/raw/**
+
+# --- Mantener solo raw públicos necesarios para reproducibilidad ---
+!/data/raw/
+!/data/raw/cause_mapping/
+!/data/raw/cause_mapping/**
+!/data/raw/redistribution_rules/
+!/data/raw/redistribution_rules/**
+
+# --- Mantener otras carpetas raw públicas SOLO si existen y NO son sensibles ---
+# !/data/raw/<carpeta_publica>/
+# !/data/raw/<carpeta_publica>/**
+
+# --- Proteger explícitamente SINADEF confidencial ---
+/data/raw/sinadef/
+/data/raw/sinadef/**
+
+# ============================================================
+# 3. ARCHIVOS TABULARES Y SERIALIZADOS (EXCLUIR GLOBALMENTE)
+#    Luego se reabren solo las excepciones seguras/versionables.
+# ============================================================
+*.csv
+*.tsv
+*.xlsx
+*.xls
+*.ods
+*.parquet
+*.feather
+*.fst
+*.rds
+*.rda
+*.RData
+*.sqlite
+*.db
+
+# ============================================================
+# 4. JSON / GEOJSON / OTROS POTENCIALMENTE SENSIBLES
+# ============================================================
+*.json
+*.geojson
+*.ndjson
+
+# ============================================================
+# 5. DOCUMENTOS Y REPORTES RENDERIZADOS
+# ============================================================
+*.pdf
+*.docx
+*.doc
+*.pptx
+*.ppt
+*.pptm
+*.html
+*_files/
+.quarto/
+
+# ============================================================
+# 6. LOGS, TEMPORALES Y RESPALDOS
+# ============================================================
+*.log
+*.tmp
+*.temp
+*.bak
+*.out
+*.err
+*.aux
+*.toc
+*.lof
+*.lot
+*.gz
+*.zip
+*.7z
+
+# ============================================================
+# 7. R / RSTUDIO
+# ============================================================
+.Rhistory
+.RData
+.Ruserdata
+.Rproj.user/
+/.Rproj.user/
+
+# ============================================================
+# 8. PYTHON / JUPYTER / SISTEMA
+# ============================================================
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+.DS_Store
+Thumbs.db
+
+# ============================================================
+# 9. EXCEPCIONES IMPORTANTES: CÓDIGO Y DOCUMENTACIÓN
+# ============================================================
+!*.R
+!*.qmd
+!*.md
+!*.txt
+!*.yml
+!*.yaml
+!*.css
+!*.scss
+!*.js
+!*.sql
+!*.sh
+!*.bat
+!*.ps1
+!*.gitignore
+!*.Rproj
+!LICENSE
+
+# ============================================================
+# 10. EXCEPCIONES IMPORTANTES: CONFIGURACIÓN DEL PROYECTO
+# ============================================================
+!/config/
+!/config/*.yml
+!/config/*.yaml
+!/config/*.R
+!/config/*.csv
+!/config/*.txt
+
+# ============================================================
+# 11. EXCEPCIONES IMPORTANTES: RAW PÚBLICOS ESPECÍFICOS
+# ============================================================
+!/data/raw/cause_mapping/*.xlsx
+!/data/raw/cause_mapping/*.xls
+!/data/raw/cause_mapping/*.csv
+!/data/raw/redistribution_rules/*.xlsx
+!/data/raw/redistribution_rules/*.xls
+!/data/raw/redistribution_rules/*.csv
+
+# ============================================================
+# 12. EXCEPCIONES IMPORTANTES: INFRAESTRUCTURA REPRODUCIBLE
+# ============================================================
+!/renv.lock
+!/.Rprofile
+!/renv/
+/renv/library/
+/renv/staging/
+!/renv/activate.R
+!/renv/settings.json
+
+# ============================================================
+# 13. EXCEPCIONES IMPORTANTES: ARCHIVOS ESTRUCTURALES DEL PROYECTO
+# ============================================================
+!tree_project.txt
+!Estructura-del-proyecto-actualizada.txt
+!arbol-estructura.R
+!README.qmd
+!README.md
+
+# ============================================================
+# 14. EXCEPCIONES EXPLÍCITAS PARA MAESTROS/DICCIONARIOS VERSIONABLES
+# ============================================================
+!config/maestro_age_simple.csv
+!config/maestro_external_inputs.csv
+!data/raw/cause_mapping/codificacion-causas-enfermedad.xlsx
+!data/raw/redistribution_rules/codigos-redistribucion-muerte.xlsx
+!data/raw/redistribution_rules/patch_targets_redistribucion_excluir_yll.csv
+
+# ============================================================
+# 15. RECORDATORIO
+# ============================================================
+# Antes de hacer git add ., confirma con:
+#   git status --ignored
+# y revisa especialmente que NO entren:
+# - data/raw/sinadef/
+# - data/final/
+# - data/derived/
+# - outputs/
+# - cualquier csv/parquet derivado sensible
+# ============================================================

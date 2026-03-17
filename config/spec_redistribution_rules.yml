@@ -1,0 +1,36 @@
+dataset_id: death_garbage_redistribution_rules
+table_name: redistribution_rules
+primary_key: [rule_id]
+
+required_columns:
+  rule_id: character
+  source_group_code: character
+  source_group_name: character
+  target_cause_concept_id: integer
+  target_weight: numeric
+  sex_restriction: character
+  age_start: integer
+  age_end: integer
+  notes: character
+
+constraints:
+  rule_id: {allow_na: false}
+  source_group_code: {allow_na: false}
+  source_group_name: {allow_na: false}
+  target_cause_concept_id: {allow_na: false}
+  target_weight: {allow_na: false, min: 0}
+  sex_restriction: {allow_na: true}
+  age_start: {allow_na: true, min: 0, max: 110}
+  age_end: {allow_na: true, min: 0, max: 110}
+  notes: {allow_na: true}
+
+dictionary:
+  rule_id: {label: "Identificador único de regla"}
+  source_group_code: {label: "Código de grupo garbage origen"}
+  source_group_name: {label: "Nombre de grupo garbage origen"}
+  target_cause_concept_id: {label: "Causa destino"}
+  target_weight: {label: "Peso de redistribución"}
+  sex_restriction: {label: "Restricción por sexo"}
+  age_start: {label: "Edad mínima aplicable"}
+  age_end: {label: "Edad máxima aplicable"}
+  notes: {label: "Notas metodológicas"}

@@ -1,0 +1,534 @@
+---
+title: "Fuentes YAML del proyecto"
+author: "Generado automáticamente desde R"
+date: "`r Sys.Date()`"
+output:
+  pdf_document:
+    toc: true
+    number_sections: true
+    latex_engine: xelatex
+fontsize: 10pt
+geometry: margin=1in
+---
+
+# Descripción
+
+Este documento consolida los archivos YAML (`.yml`, `.yaml`) del proyecto.
+
+Cada bloque corresponde a un archivo independiente e incluye su ruta relativa, una referencia breve de uso y su contenido completo.
+
+# Directorios revisados
+
+- `C:/Users/Usuario/OneDrive/Consultorias_Personales/Carga-CDC-Peru-2023/carga-enfermedad-peru-2018-2024/mortalidad-causa-especifica/config`
+
+# Resumen de archivos
+
+1. `external_sources.yml` — `config/external_sources.yml`
+2. `spec_cause_master.yml` — `config/spec_cause_master.yml`
+3. `spec_death_cause_final.yml` — `config/spec_death_cause_final.yml`
+4. `spec_death_record_normalized.yml` — `config/spec_death_record_normalized.yml`
+5. `spec_death_record_raw.yml` — `config/spec_death_record_raw.yml`
+6. `spec_redistribution_rules.yml` — `config/spec_redistribution_rules.yml`
+
+
+# Archivo: external_sources.yml
+
+**Ruta relativa:** `config/external_sources.yml`
+
+**Tipo:** archivo de configuración o especificación en YAML.
+
+**Archivo independiente dentro del proyecto.**
+
+**Uso sugerido:** referenciarlo o leerlo desde su ruta: `config/external_sources.yml`
+
+**Claves principales detectadas:**
+
+- `external_datasets`
+
+**Contenido:**
+
+```yaml
+external_datasets:
+
+  population_result:
+    project: demografia-poblacion-inei
+    path: ../demografia-poblacion-inei/data/final/population_inei/population_result.parquet
+    required: true
+    key_columns:
+      - year_id
+      - age
+      - sex_id
+      - location_id
+    semantic_grain: department_single_age_sex_year
+    geography_level: department_plus_national_input
+    geography_id_type: canonical_department_id_with_input_national_zero
+    geography_domain:
+      departments: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25]
+      national_input: 0
+    age_column: age
+    sex_column: sex_id
+    year_column: year_id
+    population_column: population
+    downstream_usage_contract:
+      preferred_rate_modeling_geography: department_only
+      exclude_location_ids_for_department_modeling: [0]
+      downstream_national_output_code: 9000
+      note: "Para modelamiento de tasas en mortalidad causa específica usar solo departamentos 1:25. El nacional del input usa 0; el nacional analítico downstream puede reconstruirse luego como 9000 según el contrato del proyecto."
+    notes: "Población analítica externa a edad simple, sexo, año y departamento. Dataset canónico para denominadores."
+    data_quality_notes:
+      - "No se detectaron NA en year_id, age, sex_id, location_id ni population."
+      - "Se detectaron 143 filas con population <= 0; los scripts downstream deben tratarlas como denominadores no válidos."
+
+  population_result_hierarchical:
+    project: demografia-poblacion-inei
+    path: ../demografia-poblacion-inei/data/final/population_inei/population_result_hierarchical.parquet
+    required: false
+    key_columns:
+      - year_id
+      - age
+      - sex_id
+      - location_id
+    semantic_grain: hierarchical_population
+    geography_level: mixed_hierarchical
+    geography_id_type: project_specific_hierarchy
+    notes: "Opcional. No usar como truth primaria para 09/09b salvo decisión explícita."
+
+  life_table_mortality_single_age:
+    project: tabla-mortalidad-peru
+    path: ../tabla-mortalidad-peru/data/final/life_table_mortality/single_age/ref_life_table_mortality_single_age.csv
+    required: true
+    key_columns:
+      - year_id
+      - age_start
+      - sex_id
+      - location_id
+    semantic_grain: department_single_age_sex_year
+    geography_level: department
+    geography_id_type: canonical_department_id
+    geography_domain:
+      departments: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25]
+    age_column: age_start
+    sex_column: sex_id
+    year_column: year_id
+    location_column: location_id
+    downstream_usage_contract:
+      expected_usage: "Corrección por subregistro / mortalidad esperada all-cause en scripts previos."
+      geography_alignment_required_with_population_result: true
+    notes: "Tabla de mortalidad por edad simple usada como referencia externa para procesos de completitud y mortalidad esperada."
+    data_quality_notes:
+      - "No se detectaron NA en year_id, age_start, sex_id ni location_id."
+      - "Cobertura geográfica observada: 25 departamentos."
+
+  life_table_mortality_abridged:
+    project: tabla-mortalidad-peru
+    path: ../tabla-mortalidad-peru/data/final/life_table_mortality/ref_life_table_mortality.csv
+    required: false
+    key_columns:
+      - year_id
+      - age_start
+      - sex_id
+      - location_id
+    semantic_grain: department_abridged_age_sex_year
+    geography_level: department
+    geography_id_type: canonical_department_id
+    age_column: age_start
+
+  life_table_standard_single_age:
+    project: tabla-vida-estandar
+    path: ../tabla-vida-estandar/data/final/standard_life_table/life_table_standard_reference_single_age.csv
+    required: true
+    key_columns:
+      - standard_source
+      - standard_version
+      - sex_id
+      - exact_age
+    semantic_grain: standard_single_age_sex
+    geography_level: none
+    age_column: exact_age
+    sex_column: sex_id
+    downstream_usage_contract:
+      expected_usage: "Cálculo de AVP/YLL."
+      geography_alignment_required: false
+    notes: "Tabla estándar de esperanza de vida restante para AVP/YLL. No depende de geografía."
+    data_quality_notes:
+      - "No se detectaron NA en standard_source, standard_version, sex_id ni exact_age."
+      - "Se observaron 3 categorías de sex_id; validar semántica exacta solo si 10_compute_avp_yll necesitara restringir explícitamente sexos."
+
+  death_cause_final_hierarchical_input_contract:
+    project: mortalidad-causa-especifica
+    path: data/final/death_cause_final_hierarchical/death_cause_final_hierarchical.parquet
+    required: false
+    key_columns:
+      - year_id
+      - age
+      - sex_id
+      - location_id
+      - cause_concept_id
+    semantic_grain: fine_geo_single_age_sex_year_cause
+    geography_level: fine_geo
+    geography_id_type: ubigeo_or_project_fine_geo
+    observed_location_id_properties:
+      n_unique_location_id: 1894
+      min_location_id: 10101
+      max_location_id: 250401
+      observed_nchar_location_id: [5, 6]
+    harmonization_required_before_merge_with_population_result: true
+    harmonization_target_dataset: population_result
+    harmonization_target_geography: department_only
+    harmonization_rule:
+      description: "Pad left a 6 dígitos y tomar los dos primeros dígitos como departamento."
+      pseudo_code_r:
+        - "location_id_chr6 <- sprintf('%06d', as.integer(location_id))"
+        - "location_id_dept <- as.integer(substr(location_id_chr6, 1, 2))"
+      valid_department_domain: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25]
+    expected_post_harmonization_behavior:
+      aggregate_before_population_merge: true
+      aggregation_keys:
+        - year_id
+        - location_id
+        - sex_id
+        - age
+        - cause_concept_id
+      preserve_mass_check_required: true
+      exclude_input_national_zero_from_population_grid: true
+    empirical_validation:
+      overlap_departments_with_population_result: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25]
+      post_harmonization_prop_match_vs_population_keys: 0.9877346
+    notes: "Contrato documental para scripts downstream. Este dataset entra en geografía fina; antes de modelar tasas debe colapsarse a departamento y re-agregarse."
+    data_quality_notes:
+      - "No se detectaron NA en year_id, age, sex_id, location_id, cause_concept_id ni deaths_final."
+      - "No se detectaron deaths_final negativos."
+```
+
+
+# Archivo: spec_cause_master.yml
+
+**Ruta relativa:** `config/spec_cause_master.yml`
+
+**Tipo:** archivo de configuración o especificación en YAML.
+
+**Archivo independiente dentro del proyecto.**
+
+**Uso sugerido:** referenciarlo o leerlo desde su ruta: `config/spec_cause_master.yml`
+
+**Claves principales detectadas:**
+
+- `dataset_id`
+- `table_name`
+- `primary_key`
+- `required_columns`
+- `constraints`
+- `dictionary`
+
+**Contenido:**
+
+```yaml
+dataset_id: cause_master_bod_omop
+table_name: cause_master
+primary_key: [cause_concept_id]
+
+required_columns:
+  cause_concept_id: integer
+  cause_code: character
+  cause_name: character
+  cause_level: integer
+  parent_concept_id: integer
+  is_terminal: logical
+  is_garbage: logical
+  is_residual: logical
+  is_covid_related: logical
+  icd10_regex: character
+
+constraints:
+  cause_concept_id: {allow_na: false}
+  cause_code: {allow_na: false}
+  cause_name: {allow_na: false}
+  cause_level: {allow_na: false, min: 1, max: 4}
+  parent_concept_id: {allow_na: true}
+  is_terminal: {allow_na: false}
+  is_garbage: {allow_na: false}
+  is_residual: {allow_na: false}
+  is_covid_related: {allow_na: false}
+  icd10_regex: {allow_na: true}
+
+dictionary:
+  cause_concept_id: {label: "Identificador OMOP-like de causa"}
+  cause_code: {label: "Código interno de causa"}
+  cause_name: {label: "Nombre de causa"}
+  cause_level: {label: "Nivel jerárquico de causa"}
+  parent_concept_id: {label: "Causa padre"}
+  is_terminal: {label: "Indicador de nodo terminal"}
+  is_garbage: {label: "Indicador de garbage code"}
+  is_residual: {label: "Indicador de causa residual"}
+  is_covid_related: {label: "Indicador de causa relacionada a pandemia/COVID"}
+  icd10_regex: {label: "Regex R para mapeo CIE-10"}
+```
+
+
+# Archivo: spec_death_cause_final.yml
+
+**Ruta relativa:** `config/spec_death_cause_final.yml`
+
+**Tipo:** archivo de configuración o especificación en YAML.
+
+**Archivo independiente dentro del proyecto.**
+
+**Uso sugerido:** referenciarlo o leerlo desde su ruta: `config/spec_death_cause_final.yml`
+
+**Claves principales detectadas:**
+
+- `dataset_id`
+- `table_name`
+- `primary_key`
+- `required_columns`
+- `constraints`
+- `dictionary`
+
+**Contenido:**
+
+```yaml
+dataset_id: death_cause_final
+table_name: death_cause_final
+primary_key: [year_id, location_id, sex_id, age, cause_concept_id]
+
+required_columns:
+  year_id: integer
+  location_id: integer
+  sex_id: integer
+  age: integer
+  cause_concept_id: integer
+  deaths_observed: numeric
+  deaths_post_redistribution: numeric
+  deaths_final: numeric
+  correction_factor_completeness: numeric
+  pandemic_excess_component: numeric
+  run_id: character
+
+constraints:
+  year_id: {allow_na: false, min: 2018, max: 2024}
+  location_id: {allow_na: false}
+  sex_id: {allow_na: false, allowed_values: [8507, 8532]}
+  age: {allow_na: false, min: 0, max: 110}
+  cause_concept_id: {allow_na: false}
+  deaths_observed: {allow_na: false, min: 0}
+  deaths_post_redistribution: {allow_na: false, min: 0}
+  deaths_final: {allow_na: false, min: 0}
+  correction_factor_completeness: {allow_na: true, min: 0}
+  pandemic_excess_component: {allow_na: true, min: 0}
+  run_id: {allow_na: false}
+
+dictionary:
+  year_id: {label: "Año calendario"}
+  location_id: {label: "Identificador geográfico"}
+  sex_id: {label: "Sexo OMOP-like", omop_domain_id: "Gender", is_omop_concept_id: true}
+  age: {label: "Edad simple", units: "years"}
+  cause_concept_id: {label: "Identificador de causa"}
+  deaths_observed: {label: "Muertes observadas originales"}
+  deaths_post_redistribution: {label: "Muertes tras redistribución de garbage"}
+  deaths_final: {label: "Muertes finales corregidas"}
+  correction_factor_completeness: {label: "Factor de corrección de completitud"}
+  pandemic_excess_component: {label: "Componente adicional atribuido a exceso pandémico"}
+  run_id: {label: "Identificador de corrida"}
+```
+
+
+# Archivo: spec_death_record_normalized.yml
+
+**Ruta relativa:** `config/spec_death_record_normalized.yml`
+
+**Tipo:** archivo de configuración o especificación en YAML.
+
+**Archivo independiente dentro del proyecto.**
+
+**Uso sugerido:** referenciarlo o leerlo desde su ruta: `config/spec_death_record_normalized.yml`
+
+**Claves principales detectadas:**
+
+- `dataset_id`
+- `table_name`
+- `primary_key`
+- `required_columns`
+- `constraints`
+- `dictionary`
+
+**Contenido:**
+
+```yaml
+dataset_id: death_record_sinadef_normalized
+table_name: death_record_normalized
+primary_key: [death_id]
+
+required_columns:
+  death_id: character
+  year_id: integer
+  sex_id: integer
+  age: integer
+  location_id: integer
+  icd10_ucod: character
+  source_dataset: character
+  run_id: character
+
+constraints:
+  death_id: {allow_na: false}
+  year_id: {allow_na: false, min: 2018, max: 2024}
+  sex_id: {allow_na: false, allowed_values: [8507, 8532]}
+  age: {allow_na: false, min: 0, max: 110}
+  location_id: {allow_na: false}
+  icd10_ucod: {allow_na: false}
+  source_dataset: {allow_na: false}
+  run_id: {allow_na: false}
+
+dictionary:
+  death_id: {label: "Identificador único de defunción"}
+  year_id: {label: "Año calendario de defunción"}
+  sex_id:
+    label: "Identificador OMOP-like de sexo"
+    omop_domain_id: "Gender"
+    is_omop_concept_id: true
+  age: {label: "Edad simple en años cumplidos", units: "years"}
+  location_id: {label: "Identificador geográfico armonizado"}
+  icd10_ucod: {label: "Código CIE-10 armonizado de causa básica"}
+  source_dataset: {label: "Dataset fuente"}
+  run_id: {label: "Identificador de corrida"}
+```
+
+
+# Archivo: spec_death_record_raw.yml
+
+**Ruta relativa:** `config/spec_death_record_raw.yml`
+
+**Tipo:** archivo de configuración o especificación en YAML.
+
+**Archivo independiente dentro del proyecto.**
+
+**Uso sugerido:** referenciarlo o leerlo desde su ruta: `config/spec_death_record_raw.yml`
+
+**Claves principales detectadas:**
+
+- `dataset_id`
+- `table_name`
+- `primary_key`
+- `required_columns`
+- `constraints`
+- `dictionary`
+
+**Contenido:**
+
+```yaml
+dataset_id: death_record_sinadef_raw
+table_name: death_record_raw
+primary_key: [death_id]
+
+required_columns:
+  death_id: character
+  source_record_id_raw: character
+  source_file: character
+  year_id: integer
+  date_of_death: character
+  sex_source_value: character
+  age_value_raw: numeric
+  age_unit_raw: character
+  ubigeo_residence_raw: character
+  ubigeo_occurrence_raw: character
+  icd10_ucod_raw: character
+
+constraints:
+  death_id: {allow_na: false}
+  source_record_id_raw: {allow_na: true}
+  source_file: {allow_na: false}
+  year_id: {allow_na: false, min: 2018, max: 2024}
+  date_of_death: {allow_na: true}
+  sex_source_value: {allow_na: true}
+  age_value_raw: {allow_na: true, min: 0, max: 130}
+  age_unit_raw: {allow_na: true}
+  ubigeo_residence_raw: {allow_na: true}
+  ubigeo_occurrence_raw: {allow_na: true}
+  icd10_ucod_raw: {allow_na: true}
+
+dictionary:
+  death_id:
+    label: "Identificador único sintético de defunción"
+  source_record_id_raw:
+    label: "Identificador original del registro en la fuente SINADEF"
+  source_file:
+    label: "Archivo fuente original"
+  year_id:
+    label: "Año calendario de defunción"
+  date_of_death:
+    label: "Fecha de defunción reportada"
+  sex_source_value:
+    label: "Sexo en la fuente original"
+  age_value_raw:
+    label: "Edad cruda reportada"
+    units: "years_or_source_reported"
+  age_unit_raw:
+    label: "Unidad de edad en la fuente"
+  ubigeo_residence_raw:
+    label: "Ubigeo crudo de residencia"
+  ubigeo_occurrence_raw:
+    label: "Ubigeo crudo de ocurrencia"
+  icd10_ucod_raw:
+    label: "CIE-10 crudo de causa básica"
+```
+
+
+# Archivo: spec_redistribution_rules.yml
+
+**Ruta relativa:** `config/spec_redistribution_rules.yml`
+
+**Tipo:** archivo de configuración o especificación en YAML.
+
+**Archivo independiente dentro del proyecto.**
+
+**Uso sugerido:** referenciarlo o leerlo desde su ruta: `config/spec_redistribution_rules.yml`
+
+**Claves principales detectadas:**
+
+- `dataset_id`
+- `table_name`
+- `primary_key`
+- `required_columns`
+- `constraints`
+- `dictionary`
+
+**Contenido:**
+
+```yaml
+dataset_id: death_garbage_redistribution_rules
+table_name: redistribution_rules
+primary_key: [rule_id]
+
+required_columns:
+  rule_id: character
+  source_group_code: character
+  source_group_name: character
+  target_cause_concept_id: integer
+  target_weight: numeric
+  sex_restriction: character
+  age_start: integer
+  age_end: integer
+  notes: character
+
+constraints:
+  rule_id: {allow_na: false}
+  source_group_code: {allow_na: false}
+  source_group_name: {allow_na: false}
+  target_cause_concept_id: {allow_na: false}
+  target_weight: {allow_na: false, min: 0}
+  sex_restriction: {allow_na: true}
+  age_start: {allow_na: true, min: 0, max: 110}
+  age_end: {allow_na: true, min: 0, max: 110}
+  notes: {allow_na: true}
+
+dictionary:
+  rule_id: {label: "Identificador único de regla"}
+  source_group_code: {label: "Código de grupo garbage origen"}
+  source_group_name: {label: "Nombre de grupo garbage origen"}
+  target_cause_concept_id: {label: "Causa destino"}
+  target_weight: {label: "Peso de redistribución"}
+  sex_restriction: {label: "Restricción por sexo"}
+  age_start: {label: "Edad mínima aplicable"}
+  age_end: {label: "Edad máxima aplicable"}
+  notes: {label: "Notas metodológicas"}
+```
+

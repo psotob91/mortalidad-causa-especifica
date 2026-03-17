@@ -1,0 +1,1009 @@
+---
+title: "Fuentes de utilidades del proyecto"
+author: "Generado automáticamente desde R"
+date: "`r Sys.Date()`"
+output:
+  pdf_document:
+    toc: true
+    number_sections: true
+    latex_engine: xelatex
+fontsize: 10pt
+geometry: margin=1in
+---
+
+# Descripción
+
+Este documento consolida los archivos utilitarios (`utils`) del proyecto en un solo PDF.
+
+Cada bloque corresponde a un **archivo fuente independiente** ubicado en la carpeta del proyecto.
+La finalidad es documentar de manera centralizada qué funciones auxiliares existen y desde qué ruta se invocan mediante `source()`.
+
+# Directorio base
+
+`C:/Users/Usuario/OneDrive/Consultorias_Personales/Carga-CDC-Peru-2023/carga-enfermedad-peru-2018-2024/mortalidad-causa-especifica/R`
+
+# Resumen de archivos
+
+1. `age_utils.R`  — ruta: `R/age_utils.R`
+2. `catalog_utils.R`  — ruta: `R/catalog_utils.R`
+3. `cause_utils.R`  — ruta: `R/cause_utils.R`
+4. `death_utils.R`  — ruta: `R/death_utils.R`
+5. `dictionary_utils.R`  — ruta: `R/dictionary_utils.R`
+6. `io_utils.R`  — ruta: `R/io_utils.R`
+7. `maestro_utils.R`  — ruta: `R/maestro_utils.R`
+8. `pandemic_utils.R`  — ruta: `R/pandemic_utils.R`
+9. `qc_utils.R`  — ruta: `R/qc_utils.R`
+10. `rate_utils.R`  — ruta: `R/rate_utils.R`
+11. `spec_utils.R`  — ruta: `R/spec_utils.R`
+12. `yll_utils.R`  — ruta: `R/yll_utils.R`
+
+# Archivo: age_utils.R
+
+**Ruta relativa:** `R/age_utils.R`
+
+**Tipo:** archivo fuente independiente en R.
+
+**Uso esperado:** puede cargarse con:
+
+```r
+source("R/age_utils.R")
+```
+
+**Contenido del archivo:**
+
+```r
+library(data.table)
+
+normalize_age_to_years <- function(age_value, age_unit = NULL,
+                                   age_min = 0L, age_max = 110L) {
+  a <- suppressWarnings(as.numeric(age_value))
+  u <- toupper(trimws(as.character(age_unit)))
+  
+  age_years <- fifelse(
+    is.na(a), NA_real_,
+    fifelse(
+      u %in% c("A", "AÑOS", "ANIOS", "YEAR", "YEARS", ""),
+      a,
+      fifelse(
+        u %in% c("M", "MES", "MESES", "MONTH", "MONTHS"),
+        0,
+        fifelse(
+          u %in% c("D", "DIA", "DIAS", "DAY", "DAYS"),
+          0,
+          a
+        )
+      )
+    )
+  )
+  
+  age_int <- as.integer(floor(age_years))
+  age_int[!is.na(age_int) & age_int < age_min] <- age_min
+  age_int[!is.na(age_int) & age_int > age_max] <- age_max
+  age_int
+}
+
+make_age_group_5y <- function(age) {
+  fifelse(
+    is.na(age), NA_character_,
+    fifelse(age == 0L, "<1",
+            fifelse(age %in% 1:4, "1-4",
+                    fifelse(age >= 110L, "110+",
+                            paste0(floor(age / 5) * 5, "-", floor(age / 5) * 5 + 4)
+                    )
+            )
+    )
+  )
+}
+```
+
+
+# Archivo: catalog_utils.R
+
+**Ruta relativa:** `R/catalog_utils.R`
+
+**Tipo:** archivo fuente independiente en R.
+
+**Uso esperado:** puede cargarse con:
+
+```r
+source("R/catalog_utils.R")
+```
+
+**Contenido del archivo:**
+
+```r
+# R/catalog_utils.R
+library(data.table)
+library(digest)
+library(here)
+
+catalog_paths <- function() {
+  list(
+    catalog_dir = here("data", "_catalog"),
+    artifacts_csv = here("data", "_catalog", "catalogo_artefactos.csv"),
+    runs_csv = here("data", "_catalog", "provenance_runs.csv")
+  )
+}
+
+ensure_catalog_files <- function() {
+  p <- catalog_paths()
+  dir.create(p$catalog_dir, recursive = TRUE, showWarnings = FALSE)
+  
+  if (!file.exists(p$artifacts_csv)) {
+    fwrite(
+      data.table(
+        dataset_id = character(),
+        table_name = character(),
+        version = character(),
+        run_id = character(),
+        artifact_type = character(),      # final_dataset | dictionary_ext | qc | report | staging | spec | master
+        artifact_path = character(),
+        file_ext = character(),
+        n_rows = integer(),
+        n_cols = integer(),
+        file_hash = character(),
+        created_at = character(),
+        notes = character()
+      ),
+      p$artifacts_csv
+    )
+  }
+  
+  if (!file.exists(p$runs_csv)) {
+    fwrite(
+      data.table(
+        run_id = character(),
+        dataset_id = character(),
+        version = character(),
+        started_at = character(),
+        finished_at = character(),
+        status = character(),             # success | failed | running
+        message = character()
+      ),
+      p$runs_csv
+    )
+  }
+  
+  invisible(TRUE)
+}
+
+# Normaliza schema del runs catalog (por si existe viejo con tipos incorrectos)
+normalize_runs_schema <- function(runs_dt) {
+  wanted <- c("run_id","dataset_id","version","started_at","finished_at","status","message")
+  
+  # asegurar columnas
+  for (nm in wanted) if (!nm %in% names(runs_dt)) runs_dt[, (nm) := NA_character_]
+  
+  # castear a character
+  for (nm in wanted) runs_dt[, (nm) := as.character(get(nm))]
+  
+  runs_dt[, ..wanted]
+}
+
+file_hash_md5 <- function(path) {
+  if (!file.exists(path)) return(NA_character_)
+  digest::digest(file = path, algo = "md5")
+}
+
+register_artifact <- function(dataset_id, table_name, version, run_id,
+                              artifact_type, artifact_path,
+                              n_rows = NA_integer_, n_cols = NA_integer_,
+                              notes = NA_character_) {
+  ensure_catalog_files()
+  p <- catalog_paths()
+  
+  ext <- tools::file_ext(artifact_path)
+  h <- file_hash_md5(artifact_path)
+  
+  row <- data.table(
+    dataset_id = dataset_id,
+    table_name = table_name,
+    version = version,
+    run_id = run_id,
+    artifact_type = artifact_type,
+    artifact_path = normalizePath(artifact_path, winslash = "/", mustWork = FALSE),
+    file_ext = ext,
+    n_rows = as.integer(n_rows),
+    n_cols = as.integer(n_cols),
+    file_hash = h,
+    created_at = format(Sys.time(), "%Y-%m-%d %H:%M:%S"),
+    notes = notes
+  )
+  
+  cat_dt <- fread(p$artifacts_csv)
+  cat_dt <- rbind(cat_dt, row, fill = TRUE)
+  fwrite(cat_dt, p$artifacts_csv)
+  invisible(row)
+}
+
+register_run_start <- function(run_id, dataset_id, version) {
+  ensure_catalog_files()
+  p <- catalog_paths()
+  
+  runs <- fread(p$runs_csv)
+  runs <- normalize_runs_schema(runs)
+  
+  runs <- rbind(
+    runs,
+    data.table(
+      run_id = as.character(run_id),
+      dataset_id = as.character(dataset_id),
+      version = as.character(version),
+      started_at = format(Sys.time(), "%Y-%m-%d %H:%M:%S"),
+      finished_at = NA_character_,
+      status = "running",
+      message = NA_character_
+    ),
+    fill = TRUE
+  )
+  
+  runs <- normalize_runs_schema(runs)
+  fwrite(runs, p$runs_csv)
+}
+
+register_run_finish <- function(run_id, status = c("success","failed"), message = NA_character_) {
+  status <- match.arg(status)
+  p <- catalog_paths()
+  
+  runs <- fread(p$runs_csv)
+  runs <- normalize_runs_schema(runs)
+  
+  idx <- which(runs$run_id == as.character(run_id))
+  if (length(idx) == 0) return(invisible(FALSE))
+  
+  runs[idx, `:=`(
+    finished_at = format(Sys.time(), "%Y-%m-%d %H:%M:%S"),
+    status = status,
+    message = as.character(message)
+  )]
+  
+  runs <- normalize_runs_schema(runs)
+  fwrite(runs, p$runs_csv)
+  invisible(TRUE)
+}
+```
+
+
+# Archivo: cause_utils.R
+
+**Ruta relativa:** `R/cause_utils.R`
+
+**Tipo:** archivo fuente independiente en R.
+
+**Uso esperado:** puede cargarse con:
+
+```r
+source("R/cause_utils.R")
+```
+
+**Contenido del archivo:**
+
+```r
+library(data.table)
+library(stringi)
+
+clean_icd10 <- function(x) {
+  z <- toupper(stri_trim_both(as.character(x)))
+  z[z == ""] <- NA_character_
+  z
+}
+
+icd10_first_letter <- function(x) {
+  z <- substr(clean_icd10(x), 1, 1)
+  z[!stri_detect_regex(z, "^[A-Z]$")] <- "OTHER"
+  z
+}
+
+build_regex_priority <- function(cause_master_dt) {
+  x <- copy(cause_master_dt)
+  x[, regex_len := nchar(icd10_regex)]
+  setorderv(x, c("cause_level", "regex_len"), c(1, -1))
+  x
+}
+
+map_icd_to_cause <- function(icd10_vec, cause_master_dt) {
+  icd <- clean_icd10(icd10_vec)
+  out <- rep(NA_integer_, length(icd))
+  cm <- build_regex_priority(cause_master_dt)
+  
+  for (i in seq_len(nrow(cm))) {
+    hit <- is.na(out) & !is.na(icd) & stringi::stri_detect_regex(icd, cm$icd10_regex[i])
+    out[hit] <- cm$cause_concept_id[i]
+  }
+  out
+}
+```
+
+
+# Archivo: death_utils.R
+
+**Ruta relativa:** `R/death_utils.R`
+
+**Tipo:** archivo fuente independiente en R.
+
+**Uso esperado:** puede cargarse con:
+
+```r
+source("R/death_utils.R")
+```
+
+**Contenido del archivo:**
+
+```r
+library(data.table)
+library(stringi)
+
+build_death_id <- function(year_id, row_id, prefix = "SINADEF") {
+  sprintf("%s_%s_%012d", prefix, year_id, row_id)
+}
+
+normalize_death_record <- function(dt,
+                                   sex_maestro = NULL,
+                                   location_lookup = NULL) {
+  x <- as.data.table(copy(dt))
+  
+  if (!"death_id" %in% names(x)) {
+    x[, death_id := build_death_id(year_id, .I)]
+  }
+  
+  if ("icd10_ucod_raw" %in% names(x)) {
+    x[, icd10_ucod := clean_icd10(icd10_ucod_raw)]
+  }
+  
+  if ("sex_source_value" %in% names(x) && !is.null(sex_maestro)) {
+    x[, sex_id := map_sex_to_omop(sex_source_value, sex_maestro)]
+  }
+  
+  x[]
+}
+```
+
+
+# Archivo: dictionary_utils.R
+
+**Ruta relativa:** `R/dictionary_utils.R`
+
+**Tipo:** archivo fuente independiente en R.
+
+**Uso esperado:** puede cargarse con:
+
+```r
+source("R/dictionary_utils.R")
+```
+
+**Contenido del archivo:**
+
+```r
+# R/dictionary_utils.R
+library(data.table)
+library(yaml)
+
+`%||%` <- function(x, y) if (is.null(x)) y else x
+read_spec <- function(path) yaml::read_yaml(path)
+
+# build labels for location_id from maestro_location_dept.csv (si existe)
+location_allowed_values_label <- function(config_dir) {
+  fp <- file.path(config_dir, "maestro_location_dept.csv")
+  if (!file.exists(fp)) return(NA_character_)
+  m <- fread(fp)
+  # espera: location_id, location_name, ubigeo_dept_str, level
+  m <- m[order(location_id)]
+  paste0(m$ubigeo_dept_str, "=", m$location_name, collapse = "; ")
+}
+
+dict_from_spec <- function(spec, dataset_version = "v1.0.0", run_id = NA_character_, config_dir = "config") {
+  table_name <- spec$table_name
+  dataset_id <- spec$dataset_id
+  req_cols <- names(spec$required_columns)
+  pk <- spec$primary_key
+  cts <- spec$constraints
+  dict_meta <- spec$dictionary
+  
+  get_meta <- function(col, field, default = NA_character_) {
+    if (!is.null(dict_meta) && !is.null(dict_meta[[col]]) && !is.null(dict_meta[[col]][[field]])) {
+      dict_meta[[col]][[field]]
+    } else default
+  }
+  
+  # allowed_values_label special-case: location_id
+  loc_avl <- location_allowed_values_label(config_dir)
+  
+  dt <- rbindlist(lapply(req_cols, function(col) {
+    dtype <- spec$required_columns[[col]]
+    allow_na <- cts[[col]]$allow_na %||% TRUE
+    minv <- cts[[col]]$min %||% NA
+    maxv <- cts[[col]]$max %||% NA
+    
+    allowed_values <- if (!is.null(cts[[col]]$allowed_values)) paste(cts[[col]]$allowed_values, collapse = "|") else NA_character_
+    
+    av_label <- get_meta(col, "allowed_values_label", NA_character_)
+    if (col == "location_id" && !is.na(loc_avl)) av_label <- loc_avl
+    
+    data.table(
+      dataset_id = dataset_id,
+      version = dataset_version,
+      run_id = run_id,
+      table_name = table_name,
+      column_name = col,
+      label = get_meta(col, "label", col),
+      data_type = dtype,
+      is_required = TRUE,
+      is_key = col %in% pk,
+      allow_na = allow_na,
+      value_min = minv,
+      value_max = maxv,
+      allowed_values = allowed_values,
+      allowed_values_label = av_label,
+      units = get_meta(col, "units", NA_character_),
+      omop_domain_id = get_meta(col, "omop_domain_id", NA_character_),
+      is_omop_concept_id = as.logical(get_meta(col, "is_omop_concept_id", FALSE)),
+      notes = NA_character_
+    )
+  }))
+  
+  meta_rows <- data.table(
+    dataset_id = dataset_id,
+    version = dataset_version,
+    run_id = run_id,
+    table_name = table_name,
+    column_name = c("META:age_definition", "META:year_definition", "META:population_units",
+                    "META:location_definition", "META:extrapolation_method"),
+    label = c("Definición de edad", "Definición de año", "Unidades de población",
+              "Definición de ubicación", "Método de extrapolación"),
+    data_type = "character",
+    is_required = FALSE,
+    is_key = FALSE,
+    allow_na = TRUE,
+    value_min = NA,
+    value_max = NA,
+    allowed_values = NA_character_,
+    allowed_values_label = NA_character_,
+    units = NA_character_,
+    omop_domain_id = "metadata",
+    is_omop_concept_id = FALSE,
+    notes = c(
+      spec$policy$age_definition %||% NA_character_,
+      spec$policy$year_definition %||% NA_character_,
+      spec$policy$population_units %||% NA_character_,
+      spec$policy$location_definition %||% NA_character_,
+      spec$policy$extrapolation$method %||% NA_character_
+    )
+  )
+  
+  rbind(dt, meta_rows, fill = TRUE)
+}
+
+enrich_dict_with_stats <- function(dict, data) {
+  dt <- as.data.table(data)
+  dict2 <- copy(dict)
+  
+  cols <- dict2[!startsWith(column_name, "META:"), unique(column_name)]
+  cols <- intersect(cols, names(dt))
+  
+  stats <- rbindlist(lapply(cols, function(col) {
+    x <- dt[[col]]
+    ex <- unique(x[!is.na(x)])
+    ex <- head(ex, 5)
+    ex_str <- paste(ex, collapse = "|")
+    
+    data.table(
+      column_name = col,
+      n_missing = sum(is.na(x)),
+      pct_missing = round(100 * mean(is.na(x)), 4),
+      observed_min = suppressWarnings(if (is.numeric(x) || is.integer(x)) min(x, na.rm = TRUE) else NA_real_),
+      observed_max = suppressWarnings(if (is.numeric(x) || is.integer(x)) max(x, na.rm = TRUE) else NA_real_),
+      example_values = ex_str
+    )
+  }), fill = TRUE)
+  
+  merge(dict2, stats, by = "column_name", all.x = TRUE, sort = FALSE)
+}
+```
+
+
+# Archivo: io_utils.R
+
+**Ruta relativa:** `R/io_utils.R`
+
+**Tipo:** archivo fuente independiente en R.
+
+**Uso esperado:** puede cargarse con:
+
+```r
+source("R/io_utils.R")
+```
+
+**Contenido del archivo:**
+
+```r
+library(here)
+library(yaml)
+library(data.table)
+library(arrow)
+
+project_paths <- function() {
+  list(
+    root        = here::here(),
+    config_dir  = here::here("config"),
+    raw_dir     = here::here("data", "raw"),
+    staging_dir = here::here("data", "derived", "staging"),
+    qc_dir      = here::here("data", "derived", "qc"),
+    final_dir   = here::here("data", "final"),
+    catalog_dir = here::here("data", "_catalog"),
+    reports_dir = here::here("reports"),
+    outputs_dir = here::here("outputs"),
+    r_dir       = here::here("R"),
+    scripts_dir = here::here("scripts")
+  )
+}
+
+ensure_project_dirs <- function() {
+  p <- project_paths()
+  dirs <- c(
+    p$raw_dir,
+    p$staging_dir,
+    p$qc_dir,
+    p$final_dir,
+    p$catalog_dir,
+    p$reports_dir,
+    p$outputs_dir
+  )
+  invisible(lapply(dirs, dir.create, recursive = TRUE, showWarnings = FALSE))
+}
+
+read_external_sources <- function(config_dir = here::here("config")) {
+  yaml::read_yaml(file.path(config_dir, "external_sources.yml"))
+}
+
+resolve_external_path <- function(x) {
+  normalizePath(here::here(x), winslash = "/", mustWork = FALSE)
+}
+
+assert_exists <- function(path, label = NULL) {
+  if (!file.exists(path)) {
+    stop(sprintf("No se encontró el archivo%s: %s",
+                 ifelse(is.null(label), "", paste0(" [", label, "]")),
+                 path))
+  }
+  invisible(path)
+}
+
+read_auto <- function(path, ...) {
+  ext <- tolower(tools::file_ext(path))
+  switch(
+    ext,
+    csv = data.table::fread(path, ...),
+    parquet = arrow::read_parquet(path, as_data_frame = FALSE),
+    rds = readRDS(path),
+    xlsx = openxlsx::read.xlsx(path, ...),
+    stop("Extensión no soportada: ", ext)
+  )
+}
+
+write_csv_parquet <- function(dt, csv_path = NULL, parquet_path = NULL) {
+  if (!is.null(csv_path)) data.table::fwrite(dt, csv_path)
+  if (!is.null(parquet_path)) arrow::write_parquet(dt, parquet_path)
+  invisible(TRUE)
+}
+```
+
+
+# Archivo: maestro_utils.R
+
+**Ruta relativa:** `R/maestro_utils.R`
+
+**Tipo:** archivo fuente independiente en R.
+
+**Uso esperado:** puede cargarse con:
+
+```r
+source("R/maestro_utils.R")
+```
+
+**Contenido del archivo:**
+
+```r
+library(data.table)
+library(here)
+
+read_maestro_location <- function(config_dir = here::here("config"),
+                                  hierarchical = FALSE) {
+  fp <- if (hierarchical) {
+    file.path(config_dir, "maestro_location_hierarchical.csv")
+  } else {
+    file.path(config_dir, "maestro_location_dept.csv")
+  }
+  fread(fp)
+}
+
+read_maestro_sex <- function(config_dir = here::here("config")) {
+  fread(file.path(config_dir, "maestro_sex_omop.csv"))
+}
+
+read_maestro_age <- function(config_dir = here::here("config")) {
+  fread(file.path(config_dir, "maestro_age_simple.csv"))
+}
+
+map_sex_to_omop <- function(x, sex_maestro) {
+  z <- trimws(toupper(as.character(x)))
+  out <- rep(NA_integer_, length(z))
+  out[z %in% c("M", "MASCULINO", "HOMBRE", "MALE")] <- 8507L
+  out[z %in% c("F", "FEMENINO", "MUJER", "FEMALE")] <- 8532L
+  out
+}
+```
+
+
+# Archivo: pandemic_utils.R
+
+**Ruta relativa:** `R/pandemic_utils.R`
+
+**Tipo:** archivo fuente independiente en R.
+
+**Uso esperado:** puede cargarse con:
+
+```r
+source("R/pandemic_utils.R")
+```
+
+**Contenido del archivo:**
+
+```r
+library(data.table)
+
+compute_allcause_baseline_ratio <- function(obs_dt, exp_dt) {
+  x <- merge(
+    obs_dt,
+    exp_dt,
+    by = c("year_id", "location_id", "sex_id", "age"),
+    all = TRUE,
+    suffixes = c("_obs", "_exp")
+  )
+  x[, completeness_ratio := deaths_expected / deaths_observed]
+  x[]
+}
+
+compute_pandemic_excess <- function(obs_dt, baseline_dt) {
+  x <- merge(
+    obs_dt,
+    baseline_dt,
+    by = c("year_id", "location_id", "sex_id", "age"),
+    all.x = TRUE,
+    suffixes = c("_obs", "_baseline")
+  )
+  x[, pandemic_excess := pmax(0, deaths_observed - deaths_baseline)]
+  x[]
+}
+```
+
+
+# Archivo: qc_utils.R
+
+**Ruta relativa:** `R/qc_utils.R`
+
+**Tipo:** archivo fuente independiente en R.
+
+**Uso esperado:** puede cargarse con:
+
+```r
+source("R/qc_utils.R")
+```
+
+**Contenido del archivo:**
+
+```r
+# R/qc_utils.R
+library(data.table)
+
+qc_pk_duplicates <- function(dt, pk) {
+  dt[, .N, by = pk][N > 1]
+}
+
+qc_missing_required <- function(dt, req_cols) {
+  data.table(
+    column = req_cols,
+    n_missing = sapply(req_cols, \(c) sum(is.na(dt[[c]]))),
+    pct_missing = sapply(req_cols, \(c) round(100 * mean(is.na(dt[[c]])), 6))
+  )
+}
+
+qc_nonnegative <- function(dt, col) {
+  dt[get(col) < 0]
+}
+
+# FIX: setorder(x, by_cols, age_col) -> setorderv con vector de columnas
+qc_tail_monotone_flag <- function(dt,
+                                  age_col = "age",
+                                  pop_col = "population",
+                                  start_age = 70L,
+                                  by_cols = c("year_id", "sex_id", "location_id")) {
+  x <- as.data.table(dt)[get(age_col) >= start_age]
+  if (nrow(x) == 0) return(data.table())
+  
+  # ordenar por columnas dinámicas
+  data.table::setorderv(x, cols = c(by_cols, age_col))
+  
+  x[, pop_prev := shift(get(pop_col)), by = by_cols]
+  x[, inc_flag := !is.na(pop_prev) & get(pop_col) > pop_prev]
+  
+  x[inc_flag == TRUE, .N, by = by_cols]
+}
+
+# QC detectivo: national (00) vs suma deptos (01–25)
+qc_national_vs_dept_sum <- function(dt,
+                                    location_col = "location_id",
+                                    national_id = 0L,
+                                    dept_ids = 1:25,
+                                    by_cols = c("year_id", "sex_id", "age"),
+                                    pop_col = "population",
+                                    pct_tol = 0.001) {
+  x <- as.data.table(dt)
+  
+  nat <- x[get(location_col) == national_id,
+           .(pop_national = sum(get(pop_col), na.rm = TRUE)),
+           by = by_cols]
+  
+  dep <- x[get(location_col) %in% dept_ids,
+           .(pop_dept_sum = sum(get(pop_col), na.rm = TRUE)),
+           by = by_cols]
+  
+  out <- merge(nat, dep, by = by_cols, all = TRUE)
+  
+  out[, diff_abs := pop_national - pop_dept_sum]
+  out[, diff_pct := fifelse(!is.na(pop_dept_sum) & pop_dept_sum > 0,
+                            100 * diff_abs / pop_dept_sum,
+                            NA_real_)]
+  
+  out[, flag_diff := fifelse(!is.na(diff_pct) & abs(diff_pct) > (pct_tol * 100), TRUE, FALSE)]
+  out[, flag_missing := is.na(pop_national) | is.na(pop_dept_sum)]
+  
+  data.table::setorderv(out, cols = by_cols)
+  out[]
+}
+
+qc_hierarchical_national_additive_hard <- function(dt,
+                                                   base_locations = 1:25,
+                                                   national_additive_id = 9000L) {
+  stopifnot(all(c("year_id","age","sex_id","location_id","population") %in% names(dt)))
+  
+  # 1) No permitir location_id = 0
+  if (any(dt$location_id == 0L)) {
+    stop("QC HARD FAIL: Vista jerárquica contiene location_id=0 (nacional original). Debe excluirse.")
+  }
+  
+  # 2) Debe existir 9000
+  if (!any(dt$location_id == national_additive_id)) {
+    stop("QC HARD FAIL: Vista jerárquica no contiene location_id=9000 (nacional aditivo).")
+  }
+  
+  # 3) Debe cubrir exactamente base_locations
+  missing_base <- setdiff(base_locations, unique(dt$location_id))
+  if (length(missing_base) > 0) {
+    stop("QC HARD FAIL: faltan deptos base en vista jerárquica: ", paste(missing_base, collapse = ", "))
+  }
+  
+  # 4) Chequeo exacto: 9000 == suma deptos por celda
+  dt_dept <- dt[location_id %in% base_locations,
+                .(dept_sum = sum(population)), by = .(year_id, age, sex_id)]
+  
+  dt_nat <- dt[location_id == national_additive_id,
+               .(nat_pop = population), by = .(year_id, age, sex_id)]
+  
+  chk <- merge(dt_dept, dt_nat, by = c("year_id","age","sex_id"), all = TRUE)
+  
+  # NAs son errores de cobertura
+  if (anyNA(chk$dept_sum) || anyNA(chk$nat_pop)) {
+    stop("QC HARD FAIL: hay celdas donde falta dept_sum o nat_pop (cobertura incompleta).")
+  }
+  
+  chk[, diff := nat_pop - dept_sum]
+  bad <- chk[diff != 0]
+  
+  if (nrow(bad) > 0) {
+    # no guardamos silenciosamente; fallamos mostrando un resumen
+    top <- bad[order(-abs(diff))][1:min(20, .N)]
+    stop(
+      "QC HARD FAIL: nacional aditivo (9000) NO es suma exacta de deptos.\n",
+      "Ejemplos (top 20 por |diff|):\n",
+      paste(capture.output(print(top)), collapse = "\n")
+    )
+  }
+  
+  invisible(TRUE)
+}
+```
+
+
+# Archivo: rate_utils.R
+
+**Ruta relativa:** `R/rate_utils.R`
+
+**Tipo:** archivo fuente independiente en R.
+
+**Uso esperado:** puede cargarse con:
+
+```r
+source("R/rate_utils.R")
+```
+
+**Contenido del archivo:**
+
+```r
+library(data.table)
+
+compute_mortality_rate <- function(deaths_dt, pop_dt,
+                                   deaths_col = "deaths_final",
+                                   pop_col = "population",
+                                   multiplier = 100000) {
+  x <- merge(
+    deaths_dt,
+    pop_dt,
+    by = c("year_id", "location_id", "sex_id", "age"),
+    all.x = TRUE
+  )
+  x[, mortality_rate := multiplier * get(deaths_col) / get(pop_col)]
+  x[]
+}
+```
+
+
+# Archivo: spec_utils.R
+
+**Ruta relativa:** `R/spec_utils.R`
+
+**Tipo:** archivo fuente independiente en R.
+
+**Uso esperado:** puede cargarse con:
+
+```r
+source("R/spec_utils.R")
+```
+
+**Contenido del archivo:**
+
+```r
+# R/spec_utils.R
+library(data.table)
+library(yaml)
+
+read_spec <- function(path) yaml::read_yaml(path)
+
+assert_cols_and_types <- function(dt, required_columns) {
+  missing_cols <- setdiff(names(required_columns), names(dt))
+  if (length(missing_cols) > 0)
+    stop("Faltan columnas obligatorias: ", paste(missing_cols, collapse = ", "))
+  
+  for (nm in names(required_columns)) {
+    want <- required_columns[[nm]]
+    x <- dt[[nm]]
+    
+    ok <- switch(
+      want,
+      integer   = is.integer(x) || (is.numeric(x) && all(is.na(x) | x == as.integer(x))),
+      numeric   = is.numeric(x),
+      character = is.character(x),
+      logical   = is.logical(x),
+      TRUE
+    )
+    if (!ok) stop("Tipo inválido en '", nm, "'. Esperado: ", want)
+  }
+  invisible(TRUE)
+}
+
+assert_unique_pk <- function(dt, pk) {
+  dups <- dt[, .N, by = pk][N > 1]
+  if (nrow(dups) > 0) stop("Duplicados en PK lógica: ", paste(pk, collapse = ", "))
+  invisible(TRUE)
+}
+
+assert_range <- function(dt, col, min = NULL, max = NULL, allow_na = TRUE) {
+  x <- dt[[col]]
+  if (!allow_na && anyNA(x)) stop("NA no permitido en: ", col)
+  if (!is.null(min) && any(x < min, na.rm = TRUE)) stop("Valores < ", min, " en: ", col)
+  if (!is.null(max) && any(x > max, na.rm = TRUE)) stop("Valores > ", max, " en: ", col)
+  invisible(TRUE)
+}
+
+assert_allowed <- function(dt, col, allowed_values, allow_na = TRUE) {
+  x <- dt[[col]]
+  if (!allow_na && anyNA(x)) stop("NA no permitido en: ", col)
+  bad <- x[!(x %in% allowed_values) & !is.na(x)]
+  if (length(bad) > 0) stop("Valores no permitidos en ", col, ": ", paste(unique(bad), collapse = ", "))
+  invisible(TRUE)
+}
+
+# ✅ NUEVO: Validador genérico basado 100% en spec
+validate_by_spec <- function(dt, spec) {
+  dt <- as.data.table(dt)
+  
+  assert_cols_and_types(dt, spec$required_columns)
+  assert_unique_pk(dt, spec$primary_key)
+  
+  cts <- spec$constraints
+  if (is.null(cts)) return(invisible(TRUE))
+  
+  for (col in intersect(names(cts), names(dt))) {
+    rule <- cts[[col]]
+    
+    allow_na <- TRUE
+    if (!is.null(rule$allow_na)) allow_na <- isTRUE(rule$allow_na)
+    
+    # allowed_values tiene prioridad
+    if (!is.null(rule$allowed_values)) {
+      assert_allowed(dt, col, rule$allowed_values, allow_na = allow_na)
+    }
+    
+    # rango (si existe)
+    minv <- if (!is.null(rule$min)) rule$min else NULL
+    maxv <- if (!is.null(rule$max)) rule$max else NULL
+    if (!is.null(minv) || !is.null(maxv) || !allow_na) {
+      assert_range(dt, col, min = minv, max = maxv, allow_na = allow_na)
+    }
+  }
+  
+  invisible(TRUE)
+}
+
+# Mantener el antiguo para proyectos INEI (sin romper nada)
+validate_population_result <- function(dt, spec) {
+  dt <- as.data.table(dt)
+  
+  assert_cols_and_types(dt, spec$required_columns)
+  assert_unique_pk(dt, spec$primary_key)
+  
+  cts <- spec$constraints
+  
+  assert_range(dt, "year_id", cts$year_id$min, cts$year_id$max, cts$year_id$allow_na)
+  assert_range(dt, "age",     cts$age$min,     cts$age$max,     cts$age$allow_na)
+  
+  assert_allowed(dt, "sex_id", cts$sex_id$allowed_values, cts$sex_id$allow_na)
+  assert_allowed(dt, "location_id", cts$location_id$allowed_values, cts$location_id$allow_na)
+  
+  assert_range(dt, "population", cts$population$min, NULL, cts$population$allow_na)
+  
+  invisible(TRUE)
+}
+```
+
+
+# Archivo: yll_utils.R
+
+**Ruta relativa:** `R/yll_utils.R`
+
+**Tipo:** archivo fuente independiente en R.
+
+**Uso esperado:** puede cargarse con:
+
+```r
+source("R/yll_utils.R")
+```
+
+**Contenido del archivo:**
+
+```r
+library(data.table)
+
+compute_yll <- function(deaths_dt, life_table_std_dt,
+                        deaths_col = "deaths_final") {
+  lt <- copy(life_table_std_dt)
+  setnames(lt, old = c("exact_age"), new = c("age"), skip_absent = TRUE)
+  
+  x <- merge(
+    deaths_dt,
+    lt,
+    by.x = c("sex_id", "age"),
+    by.y = c("sex_id", "age"),
+    all.x = TRUE
+  )
+  
+  if (!"life_expectancy" %in% names(x)) {
+    cand <- c("life_expectancy", "ex", "ex_standard")
+    nm <- cand[cand %in% names(x)][1]
+    if (!is.na(nm)) data.table::setnames(x, nm, "life_expectancy")
+  }
+  
+  x[, yll := get(deaths_col) * life_expectancy]
+  x[]
+}
+```
+

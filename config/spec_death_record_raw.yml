@@ -1,0 +1,54 @@
+dataset_id: death_record_sinadef_raw
+table_name: death_record_raw
+primary_key: [death_id]
+
+required_columns:
+  death_id: character
+  source_record_id_raw: character
+  source_file: character
+  year_id: integer
+  date_of_death: character
+  sex_source_value: character
+  age_value_raw: numeric
+  age_unit_raw: character
+  ubigeo_residence_raw: character
+  ubigeo_occurrence_raw: character
+  icd10_ucod_raw: character
+
+constraints:
+  death_id: {allow_na: false}
+  source_record_id_raw: {allow_na: true}
+  source_file: {allow_na: false}
+  year_id: {allow_na: false, min: 2018, max: 2024}
+  date_of_death: {allow_na: true}
+  sex_source_value: {allow_na: true}
+  age_value_raw: {allow_na: true, min: 0, max: 130}
+  age_unit_raw: {allow_na: true}
+  ubigeo_residence_raw: {allow_na: true}
+  ubigeo_occurrence_raw: {allow_na: true}
+  icd10_ucod_raw: {allow_na: true}
+
+dictionary:
+  death_id:
+    label: "Identificador único sintético de defunción"
+  source_record_id_raw:
+    label: "Identificador original del registro en la fuente SINADEF"
+  source_file:
+    label: "Archivo fuente original"
+  year_id:
+    label: "Año calendario de defunción"
+  date_of_death:
+    label: "Fecha de defunción reportada"
+  sex_source_value:
+    label: "Sexo en la fuente original"
+  age_value_raw:
+    label: "Edad cruda reportada"
+    units: "years_or_source_reported"
+  age_unit_raw:
+    label: "Unidad de edad en la fuente"
+  ubigeo_residence_raw:
+    label: "Ubigeo crudo de residencia"
+  ubigeo_occurrence_raw:
+    label: "Ubigeo crudo de ocurrencia"
+  icd10_ucod_raw:
+    label: "CIE-10 crudo de causa básica"
