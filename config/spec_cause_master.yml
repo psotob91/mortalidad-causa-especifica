@@ -1,7 +1,6 @@
 dataset_id: cause_master_bod_omop
 table_name: cause_master
-primary_key: [cause_concept_id]
-
+primary_key: cause_concept_id
 required_columns:
   cause_concept_id: integer
   cause_code: character
@@ -12,28 +11,13 @@ required_columns:
   is_garbage: logical
   is_residual: logical
   is_covid_related: logical
+  is_covid_specific: logical
+  is_oprm: logical
+  is_indirect_pandemic_cause: logical
+  is_pandemic_related_any: logical
+  pandemic_bucket: character
+  who_ghe_group: character
+  who_ghe_level_override: integer
+  is_transversal_pandemic_adjustment: logical
   icd10_regex: character
 
-constraints:
-  cause_concept_id: {allow_na: false}
-  cause_code: {allow_na: false}
-  cause_name: {allow_na: false}
-  cause_level: {allow_na: false, min: 1, max: 4}
-  parent_concept_id: {allow_na: true}
-  is_terminal: {allow_na: false}
-  is_garbage: {allow_na: false}
-  is_residual: {allow_na: false}
-  is_covid_related: {allow_na: false}
-  icd10_regex: {allow_na: true}
-
-dictionary:
-  cause_concept_id: {label: "Identificador OMOP-like de causa"}
-  cause_code: {label: "Código interno de causa"}
-  cause_name: {label: "Nombre de causa"}
-  cause_level: {label: "Nivel jerárquico de causa"}
-  parent_concept_id: {label: "Causa padre"}
-  is_terminal: {label: "Indicador de nodo terminal"}
-  is_garbage: {label: "Indicador de garbage code"}
-  is_residual: {label: "Indicador de causa residual"}
-  is_covid_related: {label: "Indicador de causa relacionada a pandemia/COVID"}
-  icd10_regex: {label: "Regex R para mapeo CIE-10"}

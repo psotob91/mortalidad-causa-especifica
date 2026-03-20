@@ -18,6 +18,9 @@
 #   3) El exceso pandémico se modela como componente separado y
 #      se asigna exclusivamente a causas is_covid_related == TRUE.
 #   4) Se endurece el control de duplicados y trazabilidad.
+#   5) Se armoniza geografía fina de mortalidad a departamento
+#      antes del merge con population_result y
+#      life_table_mortality_single_age.
 #
 # Nota semántica importante:
 #   - deaths_observed en este MVP es equivalente a
@@ -37,7 +40,7 @@ source(here("R", "catalog_utils.R"))
 source(here("R", "spec_utils.R"))
 
 CFG <- list(
-  version = "v0.2.0_mvp_hardening",
+  version = "v0.3.1_completeness_hardening_geo_fix",
   dataset_id = "death_cause_final",
   table_name = "death_cause_final",
   
@@ -50,7 +53,10 @@ CFG <- list(
   
   min_completeness_factor = 1.0,
   max_completeness_factor = 3.0,
-  min_observed_allcause_for_direct_ratio = 5,
+  min_observed_allcause_for_direct_ratio = 10,
+  
+  max_allowed_missing_external_prepandemic_prop = 0.005,
+  hard_fail_on_missing_external_prepandemic = TRUE,
   
   verbose = TRUE,
   
@@ -77,6 +83,10 @@ for (d in c(CFG$out_dir, CFG$qc_dir)) {
 
 msg <- function(...) {
   if (isTRUE(CFG$verbose)) cat(..., "\n")
+}
+
+write_qc <- function(dt, filename) {
+  fwrite(dt, file.path(CFG$qc_dir, filename))
 }
 
 ensure_project_dirs()
@@ -124,6 +134,21 @@ safe_ratio <- function(num, den) {
   out
 }
 
+clip <- function(x, lower, upper) {
+  pmin(pmax(x, lower), upper)
+}
+
+is_valid_external_cell <- function(population, mx, expected_allcause) {
+  !is.na(population) & population > 0 &
+    !is.na(mx) & mx >= 0 &
+    !is.na(expected_allcause) & expected_allcause >= 0
+}
+
+harmonize_location_to_department <- function(location_id) {
+  x <- sprintf("%06d", as.integer(location_id))
+  as.integer(substr(x, 1, 2))
+}
+
 build_dictionary_ext <- function(dt) {
   data.table(
     variable = names(dt),
@@ -141,54 +166,64 @@ build_dictionary_ext <- function(dt) {
 fill_factor_hierarchical <- function(fac_base) {
   x <- copy(fac_base)
   
-  x[, direct_ratio := safe_ratio(expected_allcause, observed_allcause)]
+  x[, external_status := fifelse(
+    is.na(population), "missing_population",
+    fifelse(is.na(mx), "missing_mx",
+            fifelse(is.na(expected_allcause), "missing_expected",
+                    fifelse(population <= 0, "invalid_population_nonpositive",
+                            "ok")))
+  )]
   
-  x[
-    is.na(direct_ratio) |
-      !is.finite(direct_ratio) |
-      observed_allcause < CFG$min_observed_allcause_for_direct_ratio,
-    direct_ratio := NA_real_
-  ]
+  x[, direct_ratio_raw := safe_ratio(expected_allcause, observed_allcause)]
+  x[, direct_ratio_eligible := !is.na(direct_ratio_raw) &
+      is.finite(direct_ratio_raw) &
+      observed_allcause >= CFG$min_observed_allcause_for_direct_ratio]
+  x[, direct_ratio := fifelse(direct_ratio_eligible, direct_ratio_raw, NA_real_)]
   
-  # resumir prepandemia por sexo-edad-location
-  pre_loc <- x[
-    year_id %in% CFG$prepandemic_years,
-    .(factor_loc = median(direct_ratio, na.rm = TRUE)),
-    by = .(location_id, sex_id, age)
-  ]
-  pre_loc[!is.finite(factor_loc), factor_loc := NA_real_]
+  pre <- x[year_id %in% CFG$prepandemic_years]
   
-  pre_sex_age <- x[
-    year_id %in% CFG$prepandemic_years,
-    .(factor_sex_age = median(direct_ratio, na.rm = TRUE)),
-    by = .(sex_id, age)
-  ]
-  pre_sex_age[!is.finite(factor_sex_age), factor_sex_age := NA_real_]
+  pre_loc <- pre[, .(
+    factor_loc = if (all(is.na(direct_ratio))) NA_real_ else median(direct_ratio, na.rm = TRUE),
+    n_years_loc = sum(!is.na(direct_ratio))
+  ), by = .(location_id, sex_id, age)]
   
-  pre_age <- x[
-    year_id %in% CFG$prepandemic_years,
-    .(factor_age = median(direct_ratio, na.rm = TRUE)),
-    by = .(age)
-  ]
-  pre_age[!is.finite(factor_age), factor_age := NA_real_]
+  pre_sex_age <- pre[, .(
+    factor_sex_age = if (all(is.na(direct_ratio))) NA_real_ else median(direct_ratio, na.rm = TRUE),
+    n_years_sex_age = sum(!is.na(direct_ratio))
+  ), by = .(sex_id, age)]
+  
+  pre_age <- pre[, .(
+    factor_age = if (all(is.na(direct_ratio))) NA_real_ else median(direct_ratio, na.rm = TRUE),
+    n_years_age = sum(!is.na(direct_ratio))
+  ), by = .(age)]
   
   x <- merge(x, pre_loc, by = c("location_id", "sex_id", "age"), all.x = TRUE, sort = FALSE)
   x <- merge(x, pre_sex_age, by = c("sex_id", "age"), all.x = TRUE, sort = FALSE)
   x <- merge(x, pre_age, by = "age", all.x = TRUE, sort = FALSE)
   
-  x[, correction_factor_completeness := fifelse(
-    year_id %in% CFG$prepandemic_years & !is.na(direct_ratio),
-    direct_ratio,
+  x[, factor_method := fifelse(
+    year_id %in% CFG$prepandemic_years & !is.na(direct_ratio), "direct_prepandemic",
+    fifelse(!is.na(factor_loc), "backoff_loc_sex_age",
+            fifelse(!is.na(factor_sex_age), "backoff_sex_age",
+                    fifelse(!is.na(factor_age), "backoff_age", "fallback_1")))
+  )]
+  
+  x[, correction_factor_preclip := fifelse(
+    year_id %in% CFG$prepandemic_years & !is.na(direct_ratio), direct_ratio,
     fifelse(!is.na(factor_loc), factor_loc,
             fifelse(!is.na(factor_sex_age), factor_sex_age,
                     fifelse(!is.na(factor_age), factor_age, 1.0)))
   )]
   
-  x[!is.finite(correction_factor_completeness), correction_factor_completeness := 1.0]
-  x[correction_factor_completeness < CFG$min_completeness_factor,
-    correction_factor_completeness := CFG$min_completeness_factor]
-  x[correction_factor_completeness > CFG$max_completeness_factor,
-    correction_factor_completeness := CFG$max_completeness_factor]
+  x[!is.finite(correction_factor_preclip), correction_factor_preclip := 1.0]
+  x[, factor_truncated_low := correction_factor_preclip < CFG$min_completeness_factor]
+  x[, factor_truncated_high := correction_factor_preclip > CFG$max_completeness_factor]
+  x[, correction_factor_completeness := clip(
+    correction_factor_preclip,
+    CFG$min_completeness_factor,
+    CFG$max_completeness_factor
+  )]
+  x[, factor_from_missing_external := external_status != "ok"]
   
   x[]
 }
@@ -205,7 +240,7 @@ assert_unique_factor_within_pk <- function(final_dt) {
   ][n_factor_non_na > 1]
   
   if (nrow(dup_factor) > 0L) {
-    fwrite(dup_factor, file.path(CFG$qc_dir, "qc_pk_multiple_factors.csv"))
+    write_qc(dup_factor, "qc_pk_multiple_factors.csv")
     stop(
       "QC HARD FAIL: existen PK con más de un correction_factor_completeness distinto. ",
       "Revisar qc_pk_multiple_factors.csv"
@@ -275,28 +310,36 @@ tryCatch({
   }
   
   pop_col <- detect_col(pop, c("population"), "population")
-  ltm_age_col <- detect_col(ltm, c("age_start", "age", "exact_age"), "edad tabla mortalidad")
+  ltm_age_col  <- detect_col(ltm, c("age_start", "age", "exact_age"), "edad tabla mortalidad")
   ltm_rate_col <- detect_col(ltm, c("mx", "mortality_rate", "mx_interp", "mx_adjusted"), "tasa mortalidad tabla")
-  ltm_loc_col <- detect_col(ltm, c("location_id"), "location_id tabla mortalidad")
+  ltm_loc_col  <- detect_col(ltm, c("location_id"), "location_id tabla mortalidad")
   ltm_year_col <- detect_col(ltm, c("year_id"), "year_id tabla mortalidad")
-  ltm_sex_col <- detect_col(ltm, c("sex_id"), "sex_id tabla mortalidad")
+  ltm_sex_col  <- detect_col(ltm, c("sex_id"), "sex_id tabla mortalidad")
   
   leaf <- copy(leaf)[
     ,
     .(
       year_id = as.integer(year_id),
-      location_id = as.integer(location_id),
+      location_id_input = as.integer(location_id),
       sex_id = as.integer(sex_id),
       age = as.integer(age),
       cause_concept_id = as.integer(cause_term_concept_id),
-      deaths_post_redistribution = as.numeric(deaths),
-      deaths_observed = as.numeric(deaths)
+      deaths_post_redistribution = as.numeric(deaths)
     )
   ][
     year_id %in% CFG$years &
       age >= CFG$age_min &
       age <= CFG$age_max
   ]
+  
+  leaf[is.na(deaths_post_redistribution), deaths_post_redistribution := 0]
+  leaf[deaths_post_redistribution < 0, deaths_post_redistribution := 0]
+  
+  leaf[, location_id_chr6 := sprintf("%06d", location_id_input)]
+  leaf[, location_id := harmonize_location_to_department(location_id_input)]
+  leaf[, deaths_observed := deaths_post_redistribution]
+  leaf[, deaths_input_semantic := "post_06_post_redistribution_equals_current_input_observed"]
+  leaf[, location_id_semantic := "harmonized_to_department_from_fine_geo_input"]
   
   cm <- cm[, .(
     cause_concept_id = as.integer(cause_concept_id),
@@ -321,15 +364,7 @@ tryCatch({
     mx = as.numeric(get(ltm_rate_col))
   )][year_id %in% CFG$years]
   
-  leaf[is.na(deaths_post_redistribution), deaths_post_redistribution := 0]
-  leaf[deaths_post_redistribution < 0, deaths_post_redistribution := 0]
-  leaf[is.na(deaths_observed), deaths_observed := 0]
-  leaf[deaths_observed < 0, deaths_observed := 0]
-  
-  pop <- pop[!is.na(population)]
   pop[population < 0, population := NA_real_]
-  
-  ltm <- ltm[!is.na(mx)]
   ltm[mx < 0, mx := NA_real_]
   
   cm_term <- cm[is_terminal == TRUE & cause_concept_id > 0]
@@ -344,6 +379,44 @@ tryCatch({
   )
   
   leaf[is.na(is_covid_related), is_covid_related := FALSE]
+  
+  # ----------------------------------------------------------
+  # Armonización geográfica a departamento y re-agregación
+  # ----------------------------------------------------------
+  leaf <- leaf[
+    ,
+    .(
+      deaths_post_redistribution = sum(deaths_post_redistribution, na.rm = TRUE),
+      deaths_observed = sum(deaths_observed, na.rm = TRUE),
+      deaths_input_semantic = unique(deaths_input_semantic)[1],
+      location_id_semantic = unique(location_id_semantic)[1],
+      is_covid_related = unique(is_covid_related)[1]
+    ),
+    by = .(year_id, location_id, sex_id, age, cause_concept_id)
+  ]
+  
+  qc_geo_harmonization <- leaf[
+    ,
+    .(
+      n_rows = .N,
+      total_deaths_post = sum(deaths_post_redistribution, na.rm = TRUE)
+    ),
+    by = .(year_id, location_id)
+  ][order(year_id, location_id)]
+  
+  qc_geo_domain <- leaf[, .(
+    n_loc = uniqueN(location_id),
+    min_loc = min(location_id, na.rm = TRUE),
+    max_loc = max(location_id, na.rm = TRUE)
+  )]
+  
+  write_qc(qc_geo_harmonization, "qc_geo_harmonization.csv")
+  write_qc(qc_geo_domain, "qc_geo_domain.csv")
+  
+  if (!all(sort(unique(leaf$location_id)) %in% 1:25)) {
+    write_qc(leaf[, .N, by = location_id][order(location_id)], "qc_invalid_department_ids_after_harmonization.csv")
+    stop("QC HARD FAIL: location_id armonizado fuera del dominio 1:25.")
+  }
   
   # ----------------------------------------------------------
   # All-cause observado y esperado
@@ -376,8 +449,43 @@ tryCatch({
     sort = FALSE
   )
   
+  fac_base[, expected_allcause := as.numeric(expected_allcause)]
+  fac_base[, observed_allcause := as.numeric(observed_allcause)]
+  fac_base[, valid_external_cell := is_valid_external_cell(population, mx, expected_allcause)]
+  
   fac_base <- fill_factor_hierarchical(fac_base)
   fac_base[, observed_corrected_allcause := observed_allcause * correction_factor_completeness]
+  
+  # ----------------------------------------------------------
+  # QC temprano de faltantes externos
+  # ----------------------------------------------------------
+  qc_missing_external_summary <- fac_base[, .(
+    n_cells = .N,
+    n_missing_external = sum(external_status != "ok", na.rm = TRUE),
+    prop_missing_external = mean(external_status != "ok", na.rm = TRUE)
+  ), by = .(year_id)][order(year_id)]
+  
+  qc_missing_external_examples <- fac_base[
+    external_status != "ok",
+    .(year_id, location_id, sex_id, age, population, mx, expected_allcause, observed_allcause, external_status)
+  ][order(year_id, location_id, sex_id, age)]
+  
+  write_qc(qc_missing_external_summary, "qc_missing_external_summary.csv")
+  write_qc(qc_missing_external_examples, "qc_missing_external_examples.csv")
+  
+  prep_missing_prop <- fac_base[
+    year_id %in% CFG$prepandemic_years,
+    mean(external_status != "ok", na.rm = TRUE)
+  ]
+  
+  if (isTRUE(CFG$hard_fail_on_missing_external_prepandemic) &&
+      is.finite(prep_missing_prop) &&
+      prep_missing_prop > CFG$max_allowed_missing_external_prepandemic_prop) {
+    stop(
+      "QC HARD FAIL: proporción de faltantes externos en prepandemia supera el umbral. ",
+      "Revisar qc_missing_external_summary.csv y qc_missing_external_examples.csv"
+    )
+  }
   
   # ----------------------------------------------------------
   # Exceso pandémico
@@ -454,11 +562,20 @@ tryCatch({
   final <- merge(
     leaf[, .(
       year_id, location_id, sex_id, age, cause_concept_id,
-      deaths_observed, deaths_post_redistribution
+      deaths_observed, deaths_post_redistribution, deaths_input_semantic, location_id_semantic
     )],
     fac_base[, .(
       year_id, location_id, sex_id, age,
       correction_factor_completeness,
+      correction_factor_preclip,
+      factor_method,
+      factor_truncated_low,
+      factor_truncated_high,
+      factor_from_missing_external,
+      direct_ratio_raw,
+      direct_ratio,
+      direct_ratio_eligible,
+      external_status,
       observed_allcause,
       expected_allcause,
       observed_corrected_allcause,
@@ -491,12 +608,34 @@ tryCatch({
   final[, run_id := run_id]
   
   # ----------------------------------------------------------
+  # Hard checks sobre final
+  # ----------------------------------------------------------
+  qc_final_completeness_extremes <- final[
+    correction_factor_completeness < CFG$min_completeness_factor |
+      correction_factor_completeness > CFG$max_completeness_factor
+  ][order(year_id, location_id, sex_id, age, cause_concept_id)]
+  
+  write_qc(qc_final_completeness_extremes, "qc_final_completeness_extremes.csv")
+  
+  if (any(final$correction_factor_completeness < CFG$min_completeness_factor, na.rm = TRUE)) {
+    stop("QC HARD FAIL: correction_factor_completeness por debajo del mínimo.")
+  }
+  
+  if (any(final$correction_factor_completeness > CFG$max_completeness_factor, na.rm = TRUE)) {
+    stop("QC HARD FAIL: correction_factor_completeness por encima del máximo.")
+  }
+  
+  if (nrow(fac_base[year_id %in% CFG$prepandemic_years & external_status != "ok"]) > 0L) {
+    msg("Advertencia: existen celdas prepandemia sin insumos externos válidos. Revisar QC enriquecido.")
+  }
+  
+  # ----------------------------------------------------------
   # Duplicados accidentales: endurecer control
   # ----------------------------------------------------------
   dup_pk <- final[, .N, by = .(year_id, location_id, sex_id, age, cause_concept_id)][N > 1]
   
   if (nrow(dup_pk) > 0L) {
-    fwrite(dup_pk, file.path(CFG$qc_dir, "qc_duplicate_pk_precollapse.csv"))
+    write_qc(dup_pk, "qc_duplicate_pk_precollapse.csv")
     assert_unique_factor_within_pk(final)
     
     final <- final[, .(
@@ -515,6 +654,7 @@ tryCatch({
       covid_base_sum = unique(covid_base_sum[!is.na(covid_base_sum)])[1],
       covid_weight = unique(covid_weight[!is.na(covid_weight)])[1],
       deaths_observed_semantic = unique(deaths_observed_semantic)[1],
+      location_id_semantic = unique(location_id_semantic)[1],
       run_id = unique(run_id)[1]
     ), by = .(year_id, location_id, sex_id, age, cause_concept_id)]
   }
@@ -537,7 +677,6 @@ tryCatch({
     correction_factor_completeness, pandemic_excess_component, run_id
   )], spec_final)
   
-  # 1) QC resumen de factores
   qc_factor_summary <- fac_base[, .(
     n = .N,
     min_factor = suppressWarnings(min(correction_factor_completeness, na.rm = TRUE)),
@@ -547,7 +686,6 @@ tryCatch({
     max_factor = suppressWarnings(max(correction_factor_completeness, na.rm = TRUE))
   ), by = .(year_id)][order(year_id)]
   
-  # 2) Balance all-cause por celda
   qc_allcause_balance <- final[
     ,
     .(
@@ -559,7 +697,6 @@ tryCatch({
     by = .(year_id, location_id, sex_id, age)
   ][order(year_id, location_id, sex_id, age)]
   
-  # 3) Balance anual
   qc_year_summary <- final[, .(
     deaths_post = sum(deaths_post_redistribution, na.rm = TRUE),
     deaths_final_net = sum(deaths_final_net_of_pandemic, na.rm = TRUE),
@@ -567,7 +704,6 @@ tryCatch({
     pandemic_excess = sum(pandemic_excess_component, na.rm = TRUE)
   ), by = .(year_id)][order(year_id)]
   
-  # 4) Resumen pandémico por año
   qc_pandemic_by_year <- fac_base[, .(
     observed_allcause = sum(observed_allcause, na.rm = TRUE),
     expected_allcause = sum(expected_allcause, na.rm = TRUE),
@@ -575,14 +711,38 @@ tryCatch({
     pandemic_excess_allcause = sum(pandemic_excess_allcause, na.rm = TRUE)
   ), by = .(year_id)][order(year_id)]
   
-  # 5) Faltantes externos
   qc_missing_external <- fac_base[
-    is.na(population) | is.na(mx) | is.na(expected_allcause),
+    external_status != "ok",
     .N,
-    by = .(year_id)
-  ][order(year_id)]
+    by = .(year_id, external_status)
+  ][order(year_id, external_status)]
   
-  # 6) Auditoría de completitud por celda
+  qc_factor_method_summary <- fac_base[
+    ,
+    .N,
+    by = .(year_id, factor_method)
+  ][order(year_id, factor_method)]
+  
+  qc_factor_flags_summary <- fac_base[, .(
+    n = .N,
+    n_direct_eligible = sum(direct_ratio_eligible, na.rm = TRUE),
+    n_truncated_low = sum(factor_truncated_low, na.rm = TRUE),
+    n_truncated_high = sum(factor_truncated_high, na.rm = TRUE),
+    n_from_missing_external = sum(factor_from_missing_external, na.rm = TRUE)
+  ), by = .(year_id)][order(year_id)]
+  
+  qc_backoff_extremes <- fac_base[
+    factor_method != "direct_prepandemic",
+    .(
+      year_id, location_id, sex_id, age,
+      observed_allcause, expected_allcause,
+      correction_factor_preclip,
+      correction_factor_completeness,
+      factor_method,
+      external_status
+    )
+  ][order(-correction_factor_completeness)][1:min(.N, 200)]
+  
   mortality_completeness_audit <- fac_base[, .(
     year_id, location_id, sex_id, age,
     population,
@@ -596,7 +756,6 @@ tryCatch({
     run_id = run_id
   )][order(year_id, location_id, sex_id, age)]
   
-  # 7) Auditoría de distribución pandémica
   mortality_pandemic_allocation_audit <- final[, .(
     year_id, location_id, sex_id, age, cause_concept_id,
     deaths_post_redistribution,
@@ -609,12 +768,10 @@ tryCatch({
     run_id
   )][order(year_id, location_id, sex_id, age, cause_concept_id)]
   
-  # 8) Factores extremos
   qc_factor_extremes <- mortality_completeness_audit[
     order(-correction_factor_completeness)
   ][1:min(.N, 200)]
   
-  # 9) Celdas con exceso pandémico alto
   qc_pandemic_extremes <- final[
     ,
     .(
@@ -628,14 +785,12 @@ tryCatch({
     pandemic_share_over_final := fifelse(total_final > 0, total_pandemic / total_final, NA_real_)
   ][order(-pandemic_share_over_final)][1:min(.N, 200)]
   
-  # 10) chequeo semántico explícito
   qc_semantic_note <- data.table(
     variable = "deaths_observed",
     semantic_note = "equals_post_redistribution_in_current_mvp",
     run_id = run_id
   )
   
-  # Hard checks extra
   if (nrow(final[, .N, by = .(year_id, location_id, sex_id, age, cause_concept_id)][N > 1]) > 0L) {
     stop("QC HARD FAIL: PK duplicada persiste en death_cause_final.")
   }
@@ -662,16 +817,19 @@ tryCatch({
   write_csv_parquet(final, csv_path = out_csv, parquet_path = out_parquet)
   fwrite(dict_ext, out_dict)
   
-  fwrite(qc_factor_summary, file.path(CFG$qc_dir, "qc_factor_summary.csv"))
-  fwrite(qc_allcause_balance, file.path(CFG$qc_dir, "qc_allcause_balance.csv"))
-  fwrite(qc_year_summary, file.path(CFG$qc_dir, "qc_year_summary.csv"))
-  fwrite(qc_pandemic_by_year, file.path(CFG$qc_dir, "qc_pandemic_by_year.csv"))
-  fwrite(qc_missing_external, file.path(CFG$qc_dir, "qc_missing_external.csv"))
-  fwrite(mortality_completeness_audit, file.path(CFG$qc_dir, "mortality_completeness_audit.csv"))
-  fwrite(mortality_pandemic_allocation_audit, file.path(CFG$qc_dir, "mortality_pandemic_allocation_audit.csv"))
-  fwrite(qc_factor_extremes, file.path(CFG$qc_dir, "qc_factor_extremes.csv"))
-  fwrite(qc_pandemic_extremes, file.path(CFG$qc_dir, "qc_pandemic_extremes.csv"))
-  fwrite(qc_semantic_note, file.path(CFG$qc_dir, "qc_semantic_note.csv"))
+  write_qc(qc_factor_summary, "qc_factor_summary.csv")
+  write_qc(qc_allcause_balance, "qc_allcause_balance.csv")
+  write_qc(qc_year_summary, "qc_year_summary.csv")
+  write_qc(qc_pandemic_by_year, "qc_pandemic_by_year.csv")
+  write_qc(qc_missing_external, "qc_missing_external.csv")
+  write_qc(qc_factor_method_summary, "qc_factor_method_summary.csv")
+  write_qc(qc_factor_flags_summary, "qc_factor_flags_summary.csv")
+  write_qc(qc_backoff_extremes, "qc_backoff_extremes.csv")
+  write_qc(mortality_completeness_audit, "mortality_completeness_audit.csv")
+  write_qc(mortality_pandemic_allocation_audit, "mortality_pandemic_allocation_audit.csv")
+  write_qc(qc_factor_extremes, "qc_factor_extremes.csv")
+  write_qc(qc_pandemic_extremes, "qc_pandemic_extremes.csv")
+  write_qc(qc_semantic_note, "qc_semantic_note.csv")
   
   register_artifact(
     dataset_id = CFG$dataset_id,
@@ -682,7 +840,7 @@ tryCatch({
     artifact_path = out_csv,
     n_rows = nrow(final),
     n_cols = ncol(final),
-    notes = "CSV final death_cause_final endurecido con QC de completitud y pandemia"
+    notes = "CSV final death_cause_final endurecido con QC de completitud, geografía armonizada y pandemia"
   )
   
   register_artifact(
@@ -694,7 +852,7 @@ tryCatch({
     artifact_path = out_parquet,
     n_rows = nrow(final),
     n_cols = ncol(final),
-    notes = "Parquet final death_cause_final endurecido con QC de completitud y pandemia"
+    notes = "Parquet final death_cause_final endurecido con QC de completitud, geografía armonizada y pandemia"
   )
   
   register_artifact(
@@ -709,18 +867,28 @@ tryCatch({
     notes = "Diccionario extendido death_cause_final"
   )
   
-  for (p in c(
+  qc_paths <- c(
+    file.path(CFG$qc_dir, "qc_geo_harmonization.csv"),
+    file.path(CFG$qc_dir, "qc_geo_domain.csv"),
+    file.path(CFG$qc_dir, "qc_missing_external_summary.csv"),
+    file.path(CFG$qc_dir, "qc_missing_external_examples.csv"),
+    file.path(CFG$qc_dir, "qc_final_completeness_extremes.csv"),
     file.path(CFG$qc_dir, "qc_factor_summary.csv"),
     file.path(CFG$qc_dir, "qc_allcause_balance.csv"),
     file.path(CFG$qc_dir, "qc_year_summary.csv"),
     file.path(CFG$qc_dir, "qc_pandemic_by_year.csv"),
     file.path(CFG$qc_dir, "qc_missing_external.csv"),
+    file.path(CFG$qc_dir, "qc_factor_method_summary.csv"),
+    file.path(CFG$qc_dir, "qc_factor_flags_summary.csv"),
+    file.path(CFG$qc_dir, "qc_backoff_extremes.csv"),
     file.path(CFG$qc_dir, "mortality_completeness_audit.csv"),
     file.path(CFG$qc_dir, "mortality_pandemic_allocation_audit.csv"),
     file.path(CFG$qc_dir, "qc_factor_extremes.csv"),
     file.path(CFG$qc_dir, "qc_pandemic_extremes.csv"),
     file.path(CFG$qc_dir, "qc_semantic_note.csv")
-  )) {
+  )
+  
+  for (p in qc_paths[file.exists(qc_paths)]) {
     register_artifact(
       dataset_id = CFG$dataset_id,
       table_name = CFG$table_name,

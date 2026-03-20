@@ -24,7 +24,8 @@ external_datasets:
       exclude_location_ids_for_department_modeling: [0]
       downstream_national_output_code: 9000
       note: "Para modelamiento de tasas en mortalidad causa específica usar solo departamentos 1:25. El nacional del input usa 0; el nacional analítico downstream puede reconstruirse luego como 9000 según el contrato del proyecto."
-    notes: "Población analítica externa a edad simple, sexo, año y departamento. Dataset canónico para denominadores."
+      completeness_role: "Denominador canónico para construir expected_allcause junto con life_table_mortality_single_age."    
+      notes: "Población analítica externa a edad simple, sexo, año y departamento. Dataset canónico para denominadores."
     data_quality_notes:
       - "No se detectaron NA en year_id, age, sex_id, location_id ni population."
       - "Se detectaron 143 filas con population <= 0; los scripts downstream deben tratarlas como denominadores no válidos."
@@ -64,6 +65,8 @@ external_datasets:
     downstream_usage_contract:
       expected_usage: "Corrección por subregistro / mortalidad esperada all-cause en scripts previos."
       geography_alignment_required_with_population_result: true
+      operational_formula: "expected_allcause = population_result.population * life_table_mortality_single_age.mx"
+      methodological_note: "Usar como referencia externa operativa para completitud all-cause mientras no exista una envolvente externa INEI formalmente declarada en el proyecto."
     notes: "Tabla de mortalidad por edad simple usada como referencia externa para procesos de completitud y mortalidad esperada."
     data_quality_notes:
       - "No se detectaron NA en year_id, age_start, sex_id ni location_id."

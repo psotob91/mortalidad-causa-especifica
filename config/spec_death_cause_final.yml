@@ -24,19 +24,19 @@ constraints:
   deaths_observed: {allow_na: false, min: 0}
   deaths_post_redistribution: {allow_na: false, min: 0}
   deaths_final: {allow_na: false, min: 0}
-  correction_factor_completeness: {allow_na: true, min: 0}
-  pandemic_excess_component: {allow_na: true, min: 0}
+  correction_factor_completeness: {allow_na: false, min: 1.0, max: 3.0}
+  pandemic_excess_component: {allow_na: false, min: 0}
   run_id: {allow_na: false}
 
 dictionary:
-  year_id: {label: "Año calendario"}
-  location_id: {label: "Identificador geográfico"}
-  sex_id: {label: "Sexo OMOP-like", omop_domain_id: "Gender", is_omop_concept_id: true}
-  age: {label: "Edad simple", units: "years"}
-  cause_concept_id: {label: "Identificador de causa"}
-  deaths_observed: {label: "Muertes observadas originales"}
-  deaths_post_redistribution: {label: "Muertes tras redistribución de garbage"}
-  deaths_final: {label: "Muertes finales corregidas"}
-  correction_factor_completeness: {label: "Factor de corrección de completitud"}
-  pandemic_excess_component: {label: "Componente adicional atribuido a exceso pandémico"}
+  year_id: {label: "Año analítico"}
+  location_id: {label: "Departamento analítico"}
+  sex_id: {label: "Sexo OMOP-like"}
+  age: {label: "Edad simple"}
+  cause_concept_id: {label: "Identificador OMOP-like de causa"}
+  deaths_observed: {label: "Muertes observadas en la tabla de entrada de este script; en el MVP actual equivale a deaths_post_redistribution y no a defunciones crudas pre-06"}
+  deaths_post_redistribution: {label: "Muertes tras redistribución de garbage codes del script 06"}
+  deaths_final: {label: "Muertes finales tras corrección de completitud y suma de componente pandémico"}
+  correction_factor_completeness: {label: "Factor de completitud all-cause aplicado a la celda edad-sexo-región-año"}
+  pandemic_excess_component: {label: "Componente de exceso pandémico asignado a la causa en la celda"}
   run_id: {label: "Identificador de corrida"}
