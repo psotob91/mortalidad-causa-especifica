@@ -1,0 +1,46 @@
+FLUJO DETALLADO DEL PIPELINE
+
+FASE 1: INGESTA
+- Fuente: SINADEF u otras
+- Validar estructura
+- Validar IDs
+
+FASE 2: NORMALIZACIÓN
+- Limpieza
+- Homogeneización de variables
+- Estandarización OMOP-like
+
+FASE 3: MAPEO
+- Uso de diccionarios oficiales
+- CIE → cause_id
+- Validación completa de cobertura
+
+FASE 4: REDISTRIBUCIÓN
+- Solo en causas terminales
+- Uso de reglas formales
+- Sin modificar nodos intermedios
+
+FASE 5: RECONCILIACIÓN
+- Padre = suma hijos
+- No duplicación
+- Balance total
+
+FASE 6: SUBREGISTRO
+- Aplicación de factores
+- Fuente documentada
+- Trazabilidad obligatoria
+
+FASE 7: AVP
+- Uso tabla de vida estándar
+- Edad consistente
+- No valores negativos
+
+FASE 8: AGREGACIÓN
+- Sexo
+- Edad
+- Región
+- Año
+
+FASE 9: OUTPUT
+- Tablas finales
+- Reportes

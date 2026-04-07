@@ -1,0 +1,49 @@
+PROYECTO: Mortalidad y AVP por causa específica (v2)
+
+PROPÓSITO
+Este documento define las reglas metodológicas, flujo analítico y criterios de validación del pipeline.
+
+REGLA PRINCIPAL
+Este documento debe ser revisado SIEMPRE antes de ejecutar cualquier análisis o auditoría.
+
+FUENTE DE VERDAD
+- Este documento prevalece sobre interpretaciones del modelo
+- Complementa pero no reemplaza scripts ni YAML
+
+PRIORIDAD DE FUENTES
+1. Archivos adjuntos en el chat
+2. Repo GitHub: https://github.com/psotob91/mortalidad-causa-especifica-v2
+3. Documentos fuente
+
+REGLA DE CÓDIGO
+Para archivos (.R, .yml, .yaml, .css):
+- usar primero archivo adjunto
+- si no existe, usar GitHub
+- nunca inventar código
+
+PRINCIPIOS
+- Exhaustividad
+- Exclusividad
+- Trazabilidad
+- Reproducibilidad
+- Consistencia jerárquica
+
+ESTRUCTURA PIPELINE
+1. Ingesta
+2. Normalización
+3. Mapeo
+4. Redistribución
+5. Reconciliación
+6. Subregistro
+7. AVP
+8. Agregación
+9. Output
+
+REGLA DE NO SUPOSICIÓN
+Si algo no está definido:
+- no asumir
+- proponer
+- solicitar definición
+
+VERSIONAMIENTO
+Todo cambio debe ser documentado.

@@ -1,0 +1,28 @@
+REDISTRIBUCIÓN DE CAUSAS
+
+REGLA CENTRAL
+La redistribución SOLO se realiza a nivel de causas terminales.
+
+DEFINICIÓN
+- Causa terminal: nodo hoja sin hijos
+
+REGLAS
+- No redistribuir a nodos intermedios
+- No duplicar muertes
+- No generar negativos
+- Suma total debe mantenerse
+
+INSUMOS
+- Tabla de códigos basura
+- Reglas de redistribución
+- Pesos definidos
+
+VALIDACIONES
+- Balance antes vs después
+- Distribución plausible
+- No pérdida de registros
+
+ERRORES CRÍTICOS
+- Redistribuir a nivel padre
+- No aplicar reglas completas
+- Mezclar jerarquías

@@ -1,0 +1,33 @@
+PANDEMIA (COVID-19)
+
+METODOLOGÍA
+Basado en OMS 2021
+
+CLASIFICACIÓN
+- COVID directo
+- COVID indirecto
+- causas relacionadas
+
+REGLAS
+- Evitar doble conteo
+- Uso correcto de CIE (U07, etc.)
+- Documentar decisiones
+
+SUBREGISTRO
+
+DEFINICIÓN
+Corrección de subregistro de mortalidad
+
+APLICACIÓN
+- Uso de factores de expansión
+- Fuente oficial obligatoria
+
+VALIDACIONES
+- Consistencia temporal
+- Consistencia regional
+- Trazabilidad
+
+ERRORES CRÍTICOS
+- No aplicar ajuste
+- Aplicar doble ajuste
+- Mezclar fuentes

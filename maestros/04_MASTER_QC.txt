@@ -1,0 +1,29 @@
+CONTROL DE CALIDAD (QC)
+
+QC ESTRUCTURAL
+- Llaves únicas
+- No duplicados
+- Tipos correctos
+
+QC LÓGICO
+- Sumas consistentes
+- No negativos
+- Jerarquía balanceada
+
+QC EPIDEMIOLÓGICO
+- Tendencias plausibles
+- Comparación externa
+
+QC DE PIPELINE
+- Inputs correctos
+- Outputs esperados
+- Sin pérdida de datos
+
+SALIDA DE AUDITORÍA
+
+Cada hallazgo debe incluir:
+- Problema
+- Causa
+- Solución
+- Script afectado
+- QC posterior
