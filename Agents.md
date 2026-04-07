@@ -8,6 +8,7 @@ Antes de ejecutar cualquier tarea, debes leer SIEMPRE los siguientes archivos de
 - ./maestros/02_MASTER_REGLAS_REDISTRIBUCION.txt
 - ./maestros/03_MASTER_PANDEMIA_Y_SUBREGISTRO.txt
 - ./maestros/04_MASTER_QC.txt
+- ./maestros/05_MASTER_PROMPT_AUDITORIA_FULL_REPO.txt
 
 Estos documentos constituyen la fuente metodológica principal del proyecto.
 
