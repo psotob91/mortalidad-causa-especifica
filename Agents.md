@@ -69,6 +69,25 @@ Debes verificar siempre:
 
 ---
 
+## Modo de trabajo por defecto
+
+Para tareas grandes de auditoría del repo, trabajar en dos etapas:
+
+1. **Plan**
+   - mapear scripts
+   - identificar fases
+   - listar inputs/outputs
+   - detectar riesgos
+   - proponer orden de auditoría
+   - no editar código todavía salvo solicitud explícita
+
+2. **Ejecución**
+   - auditar una fase por vez
+   - proponer cambios mínimos
+   - no avanzar a la siguiente fase si la actual queda NO APROBADA
+
+---
+
 ## NOTA FINAL
 
 Si existe conflicto entre fuentes:
