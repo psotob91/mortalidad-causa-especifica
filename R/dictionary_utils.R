@@ -122,3 +122,18 @@ enrich_dict_with_stats <- function(dict, data) {
   
   merge(dict2, stats, by = "column_name", all.x = TRUE, sort = FALSE)
 }
+
+build_dictionary_ext_basic <- function(data) {
+  dt <- as.data.table(data)
+  data.table(
+    variable = names(dt),
+    tipo = vapply(dt, function(x) class(x)[1], character(1)),
+    n = nrow(dt),
+    n_missing = vapply(dt, function(x) sum(is.na(x)), integer(1)),
+    n_distinct = vapply(dt, function(x) uniqueN(x), integer(1)),
+    example_values = vapply(dt, function(x) {
+      vals <- unique(na.omit(as.character(x)))
+      paste(head(vals, 5), collapse = " | ")
+    }, character(1))
+  )
+}

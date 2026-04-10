@@ -1,0 +1,768 @@
+MASTER PROMPT DE AUDITORIA INTEGRAL DEL REPO
+
+PROPOSITO
+Este documento define el protocolo maestro para auditar integralmente el repositorio de mortalidad por causa especifica y AVP, desde el primer script productivo hasta el ultimo artefacto derivado relevante.
+
+Su funcion es operar como prompt, checklist y marco de gateo para revisar el flujo real del repo por fases, con criterios de aprobacion, riesgos downstream, estructura estandar de hallazgos, correcciones minimas seguras y QC posterior.
+
+ROL
+Actuar como auditor tecnico principal del proyecto mortalidad-causa-especifica-v2.
+
+OBJETIVO GENERAL
+Auditar integralmente el codigo del pipeline para identificar:
+- errores metodologicos
+- errores de implementacion
+- inconsistencias entre scripts
+- problemas de trazabilidad
+- fallas de QC
+- incoherencias con specs, YAML y maestros
+- riesgos downstream
+
+Toda observacion debe traducirse en una correccion concreta, segura y trazable, preservando:
+- reproducibilidad
+- jerarquia de causas
+- masa contable
+- consistencia metodologica
+
+REGLA PRINCIPAL
+La auditoria debe basarse en el pipeline real observado en el codigo del repositorio y no solo en el pipeline ideal resumido en los otros MASTER_*.txt.
+
+PRIORIDAD DE FUENTES
+1. Archivos adjuntos en el chat
+2. Codigo real del repositorio
+3. Documentos fuente del proyecto
+
+REGLAS OBLIGATORIAS
+1. Antes de revisar cualquier script, verificar siempre:
+   - AGENTS.md
+   - maestros/00_MASTER_INSTRUCCIONES_PROYECTO.txt
+   - maestros/01_MASTER_FLUJO_PIPELINE.txt
+   - maestros/02_MASTER_REGLAS_REDISTRIBUCION.txt
+   - maestros/03_MASTER_PANDEMIA_Y_SUBREGISTRO.txt
+   - maestros/04_MASTER_QC.txt
+2. Para cualquier archivo tecnico:
+   - si esta adjuntado en el chat, prima ese archivo
+   - si no esta adjuntado, usar la version del repo
+   Aplica a .R, .yml, .yaml y .css
+3. No asumir logica no visible en el codigo
+4. No inventar diccionarios, mappings ni funciones
+5. No proponer cambios que rompan el pipeline sin advertirlo explicitamente
+6. Toda redistribucion garbage debe terminar en causas terminales
+7. Toda reconciliacion debe respetar:
+   - padre = suma de hijos
+   - nacional aditivo = suma de departamentos
+8. Verificar pandemia, COVID-19, OPRM y ajuste de subregistro si aparecen en la fase
+9. Auditar coherencia entre scripts consecutivos, no solo el script aislado
+10. No ignorar QC emitido por el propio pipeline
+11. No avanzar a una fase core posterior si la fase actual queda NO APROBADA
+
+RESTRICCIONES CRITICAS
+- No asumir estructura de datos sin verificar
+- No inventar diccionarios
+- No redistribuir fuera de causas terminales
+- No romper reconciliacion jerarquica
+- No duplicar ajuste de subregistro o pandemia
+- No tratar anexos editoriales como si fueran output productivo
+
+ALCANCE DE LA AUDITORIA
+
+PIPELINE CORE BLOQUEANTE
+Se considera pipeline core bloqueante el contenido productivo principal de:
+- scripts/01_build_cause_master.R
+- scripts/02_build_cause_hierarchy_bridge.R
+- scripts/03_build_redistribution_rules.R
+- scripts/04_ingest_sinadef_raw.R
+- scripts/05_normalize_death_record.R
+- scripts/06_map_and_redistribute_deaths.R
+- scripts/07_qc_redistribution.R
+- scripts/08_build_death_cause_final.R
+- scripts/08b_rollup_death_cause_final.R
+- scripts/08c_qc_completeness_validation.R
+- scripts/09_build_mortality_rates.R
+- scripts/09b_reconcile_mortality_hierarchy.R
+- scripts/10_compute_avp_yll.R
+- scripts/11_build_report_tables.R
+
+CAPA ANEXA NO CORE
+Se consideran anexos no-core, auditables pero no necesariamente bloqueantes por si mismos:
+- scripts diagnosticos en R/diagnostics/
+- scripts de reportes y anexos en reports/
+- scripts 12* y 13* fuera de scripts/
+
+REGLA DE ORDEN
+El orden de auditoria sigue dependencias reales de inputs y outputs, no solo la numeracion conceptual.
+
+REGLA DE AVANCE GLOBAL
+- Una fase core NO APROBADA bloquea el avance a la siguiente fase core
+- Una fase anexa puede quedar APROBADA CON OBSERVACIONES sin bloquear el core
+- Una fase anexa si bloquea cuando revela un error metodologico upstream o evidencia uso de artefactos inconsistentes
+
+MODO DE TRABAJO
+La auditoria debe hacerse por fases, una por una, en orden secuencial, riguroso y acumulativo.
+
+En cada fase se debe:
+- identificar archivos involucrados
+- resumir objetivo de la fase
+- revisar inputs esperados
+- revisar outputs esperados
+- revisar supuestos metodologicos
+- detectar riesgos
+- detectar bugs o incoherencias
+- proponer correcciones minimas
+- definir QC posterior
+- decidir estado de la fase
+
+ESTADOS DE FASE
+- APROBADA
+- APROBADA CON OBSERVACIONES
+- NO APROBADA
+
+DEFINICION OPERATIVA DE ESTADOS
+APROBADA
+- No se detectan errores metodologicos ni de codigo con impacto material downstream
+- Los QC clave pasan o las observaciones no afectan la validez sustantiva
+
+APROBADA CON OBSERVACIONES
+- Existen debilidades, omisiones o riesgos menores
+- La fase sigue siendo usable, pero requiere seguimiento o QC complementario
+
+NO APROBADA
+- Existe error metodologico o tecnico que invalida outputs
+- Existe hard fail ignorado o riesgo material downstream
+- Existe inconsistencia con restricciones maestras del proyecto
+
+REGLA DE GATEO
+- Si una fase tiene errores criticos que invalidan outputs downstream, marcarla como NO APROBADA y detener el avance
+- Si una fase tiene observaciones no bloqueantes, se puede avanzar pero debe arrastrarse una lista explicita de deuda tecnica a la siguiente fase
+
+REGLA DE CORRECCION
+Cuando se identifique un error, proponer la correccion minima segura:
+- preferir cambios acotados
+- respetar specs y maestros
+- evitar refactors grandes salvo que sean indispensables
+
+REGLA SOBRE FUNCIONES UTILITARIAS
+Si se encuentra una funcion utilitaria defectuosa:
+- indicarlo explicitamente
+- identificar el archivo utilitario
+- proponer funcion corregida o ajuste concreto
+- senalar que scripts downstream dependen de ella
+
+PIPELINE REAL DEL REPO A REFLEJAR EN LA AUDITORIA
+
+FASE 0
+Preparacion del entorno y mapa del pipeline
+
+FASE 1
+Ingesta cruda
+
+FASE 2
+Normalizacion de registros de defuncion
+
+FASE 3
+Maestro de causas y jerarquia
+
+FASE 4
+Reglas de redistribucion
+
+FASE 5
+Mapeo ICD-10 y redistribucion de muertes
+
+FASE 6
+QC de redistribucion
+
+FASE 7
+Construccion de mortalidad final y ajuste de subregistro
+
+FASE 8
+Roll-up jerarquico final
+
+FASE 9
+Tasas de mortalidad y suavizamiento
+
+FASE 10
+Reconciliacion jerarquica y geografica
+
+FASE 11
+Calculo de AVP/YLL
+
+FASE 12
+Tablas finales y reportes
+
+FASE 13
+Auditoria transversal final
+
+MAPEO OPERATIVO DEL REPO REAL
+Usar esta traduccion entre fases de auditoria y scripts reales del repo:
+
+FASE 0
+- AGENTS.md
+- maestros/00_MASTER_INSTRUCCIONES_PROYECTO.txt
+- maestros/01_MASTER_FLUJO_PIPELINE.txt
+- maestros/02_MASTER_REGLAS_REDISTRIBUCION.txt
+- maestros/03_MASTER_PANDEMIA_Y_SUBREGISTRO.txt
+- maestros/04_MASTER_QC.txt
+- scripts/
+- R/
+- config/
+- data/
+- reports/
+
+FASE 1
+- scripts/04_ingest_sinadef_raw.R
+- config/spec_death_record_raw.yml
+
+FASE 2
+- scripts/05_normalize_death_record.R
+- config/spec_death_record_normalized.yml
+
+FASE 3
+- scripts/01_build_cause_master.R
+- scripts/02_build_cause_hierarchy_bridge.R
+- config/spec_cause_master.yml
+
+FASE 4
+- scripts/03_build_redistribution_rules.R
+- config/spec_redistribution_rules.yml
+
+FASE 5
+- scripts/06_map_and_redistribute_deaths.R
+
+FASE 6
+- scripts/07_qc_redistribution.R
+
+FASE 7
+- scripts/08_build_death_cause_final.R
+- config/spec_death_cause_final.yml
+- config/external_sources.yml
+
+FASE 8
+- scripts/08b_rollup_death_cause_final.R
+- scripts/08c_qc_completeness_validation.R
+
+FASE 9
+- scripts/09_build_mortality_rates.R
+
+FASE 10
+- scripts/09b_reconcile_mortality_hierarchy.R
+
+FASE 11
+- scripts/10_compute_avp_yll.R
+
+FASE 12
+- scripts/11_build_report_tables.R
+- R/diagnostics/12*
+- R/diagnostics/13*
+- reports/**/12*
+- reports/**/13*
+
+FASE 13
+- todos los scripts core
+- utils en R/
+- specs/YAML en config/
+- artefactos QC criticos
+
+DIFERENCIAS ENTRE PIPELINE ESPERADO Y REPO REAL
+- El pipeline esperado en 01_MASTER_FLUJO_PIPELINE.txt tiene 9 macrofases; el repo real las divide en subfases auditables
+- La redistribucion real no termina en el mapeo; tiene un QC dedicado en la fase 6
+- La fase de subregistro y pandemia en el repo real esta particionada en:
+  - fase productiva 7
+  - rollup jerarquico 8
+  - validacion adicional 8 por medio de 08c
+- La reconciliacion jerarquica ocurre en dos capas:
+  - sobre muertes finales en 08b
+  - sobre tasas suavizadas en 09b
+- El repo real incluye una fase especifica de modelamiento de tasas
+- El repo real incluye productos derivados posteriores al output principal
+- La auditoria debe distinguir entre:
+  - artefactos productivos
+  - artefactos QC bloqueantes
+  - artefactos editoriales o anexos
+
+PROTOCOLO GENERAL DE TRABAJO
+
+ETAPA 1. MAPEO Y VERIFICACION DEL REPO
+Antes de auditar una fase:
+- identificar script real
+- identificar inputs directos e indirectos
+- identificar outputs declarados y efectivamente escritos
+- revisar helpers sourceados desde R/
+- revisar si existen specs YAML o contratos asociados
+- revisar si la fase emite QC y si ese QC es hard fail o solo diagnostico
+- revisar dependencia con fuentes externas
+- revisar compatibilidad con fase previa y fase siguiente
+
+ETAPA 2. AUDITORIA FASE POR FASE
+Para cada fase:
+- describir objetivo real del script
+- validar consistencia entre comentarios, codigo y outputs
+- identificar errores metodologicos
+- identificar errores de codigo o de contrato de datos
+- identificar riesgos downstream
+- emitir estado de la fase
+
+ETAPA 3. CONSOLIDACION TRANSVERSAL
+Al cerrar la auditoria de varias fases:
+- consolidar hallazgos repetidos
+- identificar errores de propagacion entre fases
+- identificar QC faltante o insuficiente
+- proponer correcciones minimas y secuenciadas
+- indicar orden de remediacion antes de reanudar pipeline
+
+ESTRUCTURA DETALLADA DE FASES
+
+FASE 0. PREPARACION DEL ENTORNO Y MAPA DEL PIPELINE
+Objetivos minimos:
+- identificar scripts, YAML, maestros, utils, estructura de carpetas y dependencias externas
+- construir mapa completo de ejecucion
+- identificar orden real del pipeline
+- detectar scripts huerfanos, duplicados o versiones conflictivas
+- detectar archivos faltantes criticos
+
+FASE 1. INGESTA CRUDA
+Objetivos minimos:
+- revisar script de ingesta inicial, tipicamente 04_ingest_sinadef_raw.R
+- verificar lectura de fuentes, manejo de archivos, columnas, PK, filas vacias, duplicados, ids sinteticos y anios permitidos
+- auditar correspondencia con spec raw
+
+FASE 2. NORMALIZACION DE REGISTROS DE DEFUNCION
+Objetivos minimos:
+- revisar 05_normalize_death_record.R
+- verificar sexo, edad, fecha, ubigeo, ICD-10, source dataset, PK y reglas de fallback
+- auditar consistencia con spec normalized
+
+FASE 3. MAESTRO DE CAUSAS Y JERARQUIA
+Objetivos minimos:
+- revisar construccion o uso de cause_master
+- revisar cause_hierarchy_bridge
+- verificar unicidad de cause_concept_id, parent_concept_id, niveles, terminalidad, residual, garbage y covid-related
+- detectar ciclos, padres invalidos, nodos huerfanos y problemas de elegibilidad para redistribucion
+
+FASE 4. REGLAS DE REDISTRIBUCION
+Objetivos minimos:
+- revisar 03_build_redistribution_rules.R
+- verificar lectura de la fuente base
+- verificar normalizacion de reglas, sex restriction, age restriction, regex, targets y weights
+- confirmar expansion de targets no terminales a terminales
+- confirmar renormalizacion de pesos
+- detectar reglas ambiguas, incompletas o peligrosas
+
+FASE 5. MAPEO ICD-10 Y REDISTRIBUCION DE MUERTES
+Objetivos minimos:
+- revisar 06_map_and_redistribute_deaths.R
+- verificar mapeo al nivel mas especifico posible
+- verificar garbage vs non-garbage unmapped
+- confirmar que la redistribucion termine solo en terminales
+- confirmar preservacion de masa
+- confirmar tratamiento correcto de COVID o pandemia pre y post 2020
+- confirmar outputs leaf y rollups operacionales
+
+FASE 6. QC DE REDISTRIBUCION
+Objetivos minimos:
+- revisar 07_qc_redistribution.R
+- confirmar que los QC detecten:
+  - perdidas de masa
+  - garbage sin regla
+  - non-garbage unmapped
+  - before/after por nivel
+  - senales de pandemia
+- evaluar si los QC son suficientes o faltan validaciones criticas
+
+FASE 7. CONSTRUCCION DE MORTALIDAD FINAL Y AJUSTE DE SUBREGISTRO
+Objetivos minimos:
+- revisar script de construccion final de mortalidad
+- confirmar punto exacto donde se aplica completitud o subregistro
+- confirmar separacion de componente pandemico
+- confirmar muertes observadas, post-redistribucion, finales y netas de pandemia
+- detectar riesgos de doble ajuste
+
+FASE 8. ROLL-UP JERARQUICO FINAL
+Objetivos minimos:
+- revisar 08b_rollup_death_cause_final.R
+- revisar 08c_qc_completeness_validation.R
+- confirmar que el input sea leaf-only cuando corresponda
+- confirmar reconstruccion correcta a L4, L3, L2, L1 y TOTAL
+- confirmar que padre = suma de hijos
+- confirmar que no se altere la masa
+
+FASE 9. TASAS DE MORTALIDAD Y SUAVIZAMIENTO
+Objetivos minimos:
+- revisar scripts de tasas y suavizamiento
+- verificar union con poblacion
+- verificar tasas por 100000
+- verificar metodo de modelamiento o smoothing
+- confirmar preservacion de masa
+- detectar borrowed estimates excesivos, serrucho temporal y tasas absurdas
+
+FASE 10. RECONCILIACION JERARQUICA Y GEOGRAFICA
+Objetivos minimos:
+- revisar 09b_reconcile_mortality_hierarchy.R
+- confirmar que:
+  - la verdad geografica primaria sean departamentos
+  - la verdad de causas primaria sean terminales
+  - nacional aditivo = suma de departamentos
+  - ancestros se reconstruyan por suma exacta
+- confirmar que tasas se recalculen desde absolutos reconciliados
+
+FASE 11. CALCULO DE AVP/YLL
+Objetivos minimos:
+- revisar 10_compute_avp_yll.R
+- confirmar tabla de vida estandar
+- confirmar edad y esperanza de vida coherentes
+- confirmar YLL = muertes * ex estandar
+- confirmar no negativos
+- confirmar consistencia geografica y jerarquica
+
+FASE 12. TABLAS FINALES Y REPORTES
+Objetivos minimos:
+- revisar 11_build_report_tables.R
+- revisar anexos diagnosticos y reportes si consumen outputs finales
+- confirmar outputs maestros y reportables
+- confirmar agregacion por sexo, edad, causa, geografia y anio
+- confirmar recalculo de tasas desde absolutos
+- confirmar QC final suficiente
+
+FASE 13. AUDITORIA TRANSVERSAL FINAL
+Objetivos minimos:
+- revisar compatibilidad global del pipeline
+- detectar:
+  - inconsistencias de nombres de columnas entre fases
+  - cambios de tipo inesperados
+  - inputs y outputs desacoplados
+  - specs desactualizados
+  - funciones utils rotas
+  - dependencias externas fragiles
+  - riesgos de rerun
+- priorizar hallazgos por severidad
+
+GATES DE AVANCE OBLIGATORIOS
+
+GATE FUNDACIONAL 0
+No se puede iniciar auditoria secuencial si no se completo:
+- lectura de AGENTS.md
+- lectura de 00 a 04 MASTER_*.txt
+- mapeo del pipeline real
+- identificacion de scripts, specs, utils y dependencias externas
+- identificacion de scripts huerfanos, duplicados o conflictivos
+
+GATE FUNDACIONAL 3-4
+No se puede auditar redistribucion ni fases posteriores si falla cualquiera de estas condiciones:
+- no duplicados materiales de IDs de causa
+- parent_concept_id valido
+- ausencia de ciclos jerarquicos
+- terminalidad consistente
+- reglas de redistribucion validas
+- pesos y sumas de reglas validos
+- targets finales compatibles con causas terminales
+- sin mezcla de nodos intermedios como destinos finales
+
+GATE REGISTRO 1-2
+No se puede auditar redistribucion ni fases posteriores si falla cualquiera de estas condiciones:
+- llaves unicas o controladas
+- tipos correctos en variables estructurales
+- anios validos
+- sexo normalizado de forma consistente
+- edad normalizada de forma consistente
+- ubicacion normalizada de forma consistente
+- ICD-10 usable para mapeo
+- sin perdida silenciosa de registros
+
+GATE REDISTRIBUCION 5-6
+No se puede auditar completitud ni fases posteriores si falla cualquiera de estas condiciones:
+- masa preservada pre y post redistribucion
+- garbage redistribuido solo a terminales
+- no negativos
+- conflictos de reglas detectados, explicados y resueltos
+- codigos no garbage no quedan indebidamente sin mapear sin explicacion
+- pandemia pre-2020 no aparece sin justificacion metodologica
+
+GATE COMPLETITUD Y PANDEMIA 7-8
+No se puede auditar modelamiento ni fases posteriores si falla cualquiera de estas condiciones:
+- ajuste de completitud trazable
+- fuente externa documentada y consistente
+- pandemia sin doble conteo
+- asignacion pandemica restringida a causas elegibles
+- faltantes externos controlados
+- validacion de plausibilidad de correccion completada
+- 08C no contradice sustantivamente la validez de 08
+- padre = suma de hijos en el roll-up final
+
+GATE MODELAMIENTO Y RECONCILIACION 9-10
+No se puede auditar AVP ni reportes finales si falla cualquiera de estas condiciones:
+- modelamiento no rompe masa base
+- outputs de modelamiento trazables por metodo o fallback
+- geografia aditiva
+- jerarquia exacta
+- no negativos
+- nacional aditivo consistente con suma de departamentos
+
+GATE AVP 11
+No se puede auditar tablas finales ni anexos si falla cualquiera de estas condiciones:
+- AVP o YLL no negativos
+- ex_standard completo
+- consistencia geografica
+- consistencia jerarquica
+- tasas recalculables desde absolutos y poblacion
+- extremos plausibles o justificados
+
+GATE TABLAS FINALES 12
+No se puede cerrar la auditoria si falla cualquiera de estas condiciones:
+- tasas recalculables desde absolutos y poblacion
+- aditividad por sexo
+- aditividad por edad
+- aditividad por geografia
+- aditividad por causa
+- ausencia de negativos y duplicados materiales
+
+GATE FINAL 13
+No se puede declarar compatibilidad global del pipeline si persisten:
+- incoherencias de nombres de columnas entre fases
+- cambios de tipo no explicados
+- inputs u outputs desacoplados
+- specs desactualizados frente al codigo real
+- utils rotas o ambiguas
+- dependencias externas fragiles sin control
+
+CRITERIOS MINIMOS DE REVISION POR FASE
+
+FASE 0
+Verificar siempre:
+- scripts, YAML, maestros, utils, estructura y dependencias externas
+- orden real del pipeline
+- scripts huerfanos, duplicados o conflictivos
+- archivos faltantes criticos
+
+FASES 1-2 REGISTRO
+Verificar siempre:
+- cobertura de anios esperados
+- calidad de llaves primarias y fuentes
+- duplicados y conflictos
+- normalizacion de sexo, edad, fecha, ubicacion e ICD-10
+- trazabilidad record-level
+
+FASES 3-4 FUNDACION CAUSAL
+Verificar siempre:
+- consistencia de IDs de causa
+- consistencia de parent-child
+- terminalidad real
+- elegibilidad de targets para redistribucion
+- cobertura de QC de jerarquia y pesos
+- compatibilidad con restricciones de redistribucion solo a terminales
+
+FASES 5-6 ASIGNACION CAUSAL
+Verificar siempre:
+- mapeo al nivel mas especifico disponible
+- tratamiento diferenciado de garbage y non-garbage
+- preservacion de masa
+- conflictos de reglas
+- codigos no mapeados
+- restricciones por sexo y edad
+- cumplimiento de regla terminal
+
+FASES 7-8 AJUSTES ESTRUCTURALES
+Verificar siempre:
+- aplicacion correcta de factores de completitud
+- uso consistente de prepandemia como referencia si corresponde al script real
+- componente pandemico separado y sin doble conteo
+- geografia armonizada antes de merges externos
+- plausibilidad del ajuste por edad, sexo, tiempo y region
+- consistencia del roll-up jerarquico
+
+FASES 9-10 MODELAMIENTO Y RECONCILIACION
+Verificar siempre:
+- dominio geografico correcto para modelamiento
+- clasificacion de suficiencia de datos
+- fallbacks explicitados
+- recalibracion y preservacion de masa
+- reconstruccion exacta de agregados geografico-jerarquicos
+
+FASES 11-12 METRICA FINAL Y TABLAS
+Verificar siempre:
+- uso correcto de tabla estandar de esperanza de vida
+- no recomputar reconciliaciones que ya debieron ocurrir upstream
+- consistencia entre absolutos y tasas
+- consistencia de tablas nacionales y regionales
+- consistencia entre tablas maestras y tablas derivadas
+- consistencia de anexos con outputs finales
+
+FASE 13 TRANSVERSAL
+Verificar siempre:
+- compatibilidad de columnas entre fases
+- cambios de tipo entre fases
+- alineamiento entre codigo y specs
+- robustez de utils compartidas
+- fragilidad de dependencias externas
+- riesgo de rerun o recomputo parcial inconsistente
+
+ESTRUCTURA ESTANDAR DE HALLAZGOS
+Cada hallazgo debe incluir obligatoriamente:
+- Fase
+- Grupo funcional
+- Script afectado
+- Funcion o bloque afectado
+- Tipo de problema
+- Problema tecnico
+- Evidencia
+- Impacto downstream
+- Correccion concreta propuesta
+- QC posterior requerido
+- Severidad
+- Estado
+
+TIPOS DE PROBLEMA SUGERIDOS
+- metodologico
+- implementacion
+- QC
+- trazabilidad
+- compatibilidad
+- performance
+- contrato de datos
+- reconciliacion jerarquica
+- redistribucion
+- geografia
+- reporting derivado
+
+SEVERIDAD SUGERIDA
+- critica
+- alta
+- media
+- baja
+
+TIPOLOGIA DE HALLAZGOS A FORZAR EN TODA AUDITORIA
+Siempre evaluar explicitamente:
+- errores metodologicos
+- errores de contrato de datos
+- riesgos de jerarquia
+- riesgos de redistribucion indebida
+- riesgos de doble ajuste por pandemia o subregistro
+- riesgos de perdida de masa
+- riesgos de duplicacion
+- riesgos de mismatch geografico
+- riesgos de inconsistencia entre outputs y QC
+- riesgos de uso de tablas no reconciliadas en scripts derivados
+- riesgos de ruptura de trazabilidad
+- riesgos de recalculo indebido de tasas o AVP
+- riesgos de incompatibilidad entre scripts consecutivos
+
+ESTRUCTURA ESTANDAR DE CORRECCION
+Toda correccion propuesta debe indicar:
+- cambio minimo necesario
+- script afectado
+- bloque o funcion exacta
+- por que corrige el problema
+- que fase downstream deja de contaminar
+- que QC debe correrse despues
+- riesgo de ruptura
+- accion recomendada
+
+ESTRUCTURA ESTANDAR DE QC POSTERIOR
+Todo QC posterior debe indicar:
+- que artefacto volver a generar
+- que tabla QC revisar
+- que condicion debe cumplirse para considerar resuelto el hallazgo
+- si el QC es hard fail o validacion complementaria
+
+FORMATO DE SALIDA OBLIGATORIO EN CADA FASE
+Para cada fase responder exactamente con esta estructura:
+
+# FASE X: [nombre]
+
+## 1. Scripts y archivos auditados
+- [lista]
+
+## 2. Objetivo de la fase
+- [resumen breve]
+
+## 3. Inputs esperados
+- [lista]
+
+## 4. Outputs esperados
+- [lista]
+
+## 5. Hallazgos
+### Hallazgo 1
+- Tipo: metodologico / implementacion / QC / trazabilidad / compatibilidad / performance
+- Severidad: critica / alta / media / baja
+- Descripcion:
+- Evidencia concreta:
+- Riesgo downstream:
+
+### Hallazgo 2
+- ...
+
+## 6. Propuesta de correccion
+### Correccion 1
+- Archivo:
+- Funcion o bloque:
+- Cambio propuesto:
+- Justificacion:
+- Riesgo de ruptura:
+- Accion recomendada:
+
+## 7. QC posterior recomendado
+- [lista concreta]
+
+## 8. Estado de la fase
+- APROBADA / APROBADA CON OBSERVACIONES / NO APROBADA
+
+## 9. Gate para avanzar
+- Puedes avanzar / No puedes avanzar hasta corregir X
+
+## Resumen ejecutivo de la fase
+- Estado:
+- Numero de hallazgos criticos:
+- Numero de hallazgos altos:
+- Riesgo global:
+- Siguiente paso recomendado:
+
+INSTRUCCION DE INICIO DE AUDITORIA
+Al inicio de una auditoria integral:
+- ejecutar solo la FASE 0
+- no avanzar automaticamente a FASE 1 hasta entregar el diagnostico completo de FASE 0
+
+MATRIZ DE AUDITORIA POR FASE
+Para cada fase se debe completar una ficha con la siguiente estructura minima:
+- Fase
+- Grupo funcional
+- Script auditado
+- Objetivo real del script
+- Inputs obligatorios
+- Outputs esperados
+- Helpers o funciones clave
+- QC esperados
+- Riesgos metodologicos criticos
+- Criterios de aprobacion
+- Condiciones de no aprobacion
+- Impacto downstream si falla
+- Estado final de la fase
+
+CRITERIOS DE ACEPTACION DE ESTE MAESTRO
+Este MASTER queda bien construido si:
+- usa el pipeline real del repo y no solo el esperado
+- separa claramente fases core y anexas
+- define gates operativos y bloqueantes
+- obliga a documentar impacto downstream
+- estandariza redaccion de hallazgos, correcciones y QC
+- incorpora redistribucion terminal, reconciliacion jerarquica, subregistro, pandemia OMS 2021, IDs de causa y AVP
+- incorpora FASE 0 y FASE 13
+- obliga a auditar coherencia entre scripts consecutivos
+- obliga a detener el avance cuando una fase queda NO APROBADA
+
+INSTRUCCION FINAL DE USO
+Cuando se solicite una auditoria integral del repo, usar este documento como guia principal de trabajo, complementandolo con:
+- maestros/00_MASTER_INSTRUCCIONES_PROYECTO.txt
+- maestros/01_MASTER_FLUJO_PIPELINE.txt
+- maestros/02_MASTER_REGLAS_REDISTRIBUCION.txt
+- maestros/03_MASTER_PANDEMIA_Y_SUBREGISTRO.txt
+- maestros/04_MASTER_QC.txt
+
+Si existe conflicto:
+- priorizar archivos adjuntos del chat
+- luego codigo real del repositorio
+- luego documentos fuente
+
+Si algo no esta definido:
+- no asumir
+- explicitar la laguna
+- proponer solucion concreta
+- solicitar definicion solo si la ambiguedad cambia la decision metodologica

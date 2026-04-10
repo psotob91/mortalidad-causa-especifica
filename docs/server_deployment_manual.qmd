@@ -1,0 +1,296 @@
+---
+title: "Manual de montaje y operacion del pipeline"
+subtitle: "Mortalidad y AVP por causa especifica"
+format:
+  pdf:
+    toc: true
+    number-sections: true
+    geometry:
+      - margin=1in
+execute:
+  echo: false
+  warning: false
+  message: false
+---
+
+# Objetivo
+
+Este manual describe como montar y ejecutar el proyecto en:
+
+- laptop local
+- servidor nuevo
+- contenedor Docker
+
+La meta es que un analista pueda cambiar un solo punto de configuracion para localizar el raw y los datasets externos, correr el preflight, ejecutar el pipeline y validar resultados sin editar scripts metodologicos.
+
+# Arquitectura operativa
+
+## Que queda dentro del repositorio
+
+- codigo del pipeline
+- configuracion del proyecto
+- outputs derivados y finales
+- reportes
+- baseline de validacion
+
+## Que puede vivir fuera del repositorio
+
+- raw SINADEF
+- datasets externos declarados en `config/external_sources.yml`
+- raw montado en disco protegido o ruta de solo lectura
+
+## Principios
+
+- los inputs externos se tratan como inmutables
+- los outputs se escriben dentro del proyecto
+- la resolucion de paths se hace desde un helper central
+- no se deben editar scripts metodologicos para cambiar rutas
+
+# Punto unico de configuracion
+
+La resolucion de inputs sigue esta precedencia:
+
+1. variables de entorno
+2. `config/runtime_paths.yml`
+3. fallback al layout local del repo
+
+## Archivo principal
+
+- `config/runtime_paths.yml`
+
+Contenido esperado:
+
+```yaml
+raw_root: ""
+external_root: ""
+
+inputs:
+  sinadef_dir: ""
+
+external_dataset_overrides:
+  population_result: ""
+  life_table_mortality_single_age: ""
+  life_table_standard_single_age: ""
+```
+
+## Variables de entorno soportadas
+
+### Raw principal
+
+- `MCE_SINADEF_DIR`
+- `MCE_RAW_ROOT`
+
+### Datasets externos
+
+- `MCE_EXTERNAL_ROOT`
+- `MCE_EXT_POPULATION_RESULT_PATH`
+- `MCE_EXT_LIFE_TABLE_MORTALITY_SINGLE_AGE_PATH`
+- `MCE_EXT_LIFE_TABLE_STANDARD_SINGLE_AGE_PATH`
+
+## Regla practica
+
+Si el raw esta en otro disco o montaje protegido:
+
+- montar el raw
+- definir `MCE_SINADEF_DIR` o `MCE_RAW_ROOT`
+- definir `MCE_EXTERNAL_ROOT` si los externos tambien viven fuera del repo
+- correr preflight
+
+# Requisitos de sistema
+
+- R disponible en linea de comandos
+- Quarto instalado
+- permisos de lectura sobre raw y externos
+- permisos de escritura sobre:
+  - `data/final`
+  - `data/derived`
+  - `data/_catalog`
+  - `reports`
+  - `outputs`
+
+Directorios recomendados de solo lectura:
+
+- raw externo
+- datasets externos
+
+# Procedimiento paso a paso
+
+## 1. Clonar y ubicar el proyecto
+
+Ubicar el repo en un directorio escribible del servidor o contenedor.
+
+## 2. Montar el raw y externos
+
+Ejemplo Linux/Docker:
+
+```bash
+export MCE_SINADEF_DIR=/mnt/protected/raw/sinadef
+export MCE_EXTERNAL_ROOT=/mnt/projects
+```
+
+Ejemplo PowerShell:
+
+```powershell
+$env:MCE_SINADEF_DIR="D:\\raw_protegido\\sinadef"
+$env:MCE_EXTERNAL_ROOT="D:\\repos_datos"
+```
+
+## 3. Ejecutar preflight
+
+```bash
+Rscript ./scripts/run_preflight_checks.R
+```
+
+Revisar:
+
+- `data/derived/qc/run_pipeline/preflight_checks.csv`
+- `data/derived/qc/run_pipeline/preflight_summary.csv`
+
+Condicion de aprobacion:
+
+- sin fallos bloqueantes
+
+## 4. Correr el pipeline
+
+### Corrida completa
+
+```bash
+Rscript ./scripts/run_pipeline.R --profile full --clean-first
+```
+
+### Solo core
+
+```bash
+Rscript ./scripts/run_pipeline.R --profile core
+```
+
+### Solo metodos
+
+```bash
+Rscript ./scripts/run_pipeline.R --profile methods
+```
+
+### Solo reportes
+
+```bash
+Rscript ./scripts/run_pipeline.R --profile reports
+```
+
+## 5. Validar baseline
+
+```bash
+Rscript ./scripts/compare_validation_baseline.R
+```
+
+Revisar:
+
+- `data/derived/qc/baseline_compare/qc_baseline_vs_rerun_summary.csv`
+
+Condicion de aprobacion:
+
+- cero diferencias sustantivas
+
+# Runner y scripts canonicos
+
+La operacion recomendada usa:
+
+- `scripts/run_preflight_checks.R`
+- `scripts/run_pipeline.R`
+
+La capa semantica oficial y el mapa historico estan documentados en:
+
+- `config/script_aliases.csv`
+- `config/pipeline_steps.csv`
+
+Esto permite operar y documentar con nombres canonicos en la estructura final limpia del repo.
+
+# Semantica de carpetas del proyecto
+
+## Codigo
+
+- `scripts/`: entrypoints operativos de uso regular.
+- `R/`: helpers y modulos compartidos.
+- `R/diagnostics/`: diagnosticos reproducibles fuera del rerun normal.
+- `R/maintenance/`: auditoria, gobernanza y mantenimiento no operativo diario.
+- `reports/`: constructores de salidas editoriales y reportables.
+- `config/`: configuracion y soporte.
+
+## Salidas
+
+- `data/derived/qc/`: QC tabular canonico del pipeline.
+- `reports/`: productos editoriales y reportables.
+- `outputs/`: auxiliares no tabulares y no editoriales.
+
+Las rutas QC y auxiliares activas usan solo nombres semanticos canonicos.
+
+# Politica de nombres
+
+## Capa oficial
+
+- scripts canonicos sin prefijo numerico
+- `run_preflight_checks.R`
+- `run_pipeline.R`
+- `script_path_canonical` en `config/pipeline_steps.csv`
+
+## Historico deprecated
+
+- `reports/deprecated/**`
+- `scripts/deprecated/**`
+- `R/diagnostics/deprecated/**`
+- `R/maintenance/deprecated/**`
+- scripts diagnosticos o de block1 fuera de la operacion vigente
+
+## Fuera de operacion
+
+- `tmp_*.R`
+- pruebas ad hoc del root
+- archivos scratch no gestionados por el runner
+
+# Interpretacion de salidas de control
+
+## Preflight
+
+Archivo principal:
+
+- `data/derived/qc/run_pipeline/preflight_checks.csv`
+
+Que revisar:
+
+- raw principal resuelto
+- externos obligatorios legibles
+- directorios de salida escribibles
+- baseline disponible
+
+## Corrida del pipeline
+
+Archivo principal:
+
+- `data/derived/qc/run_pipeline/pipeline_run_log.csv`
+
+Que revisar:
+
+- todos los steps con `status = success`
+- tiempos de ejecucion
+- script canonico ejecutado
+
+# Politica operativa de warnings
+
+## Warnings bloqueantes
+
+- fallos de preflight
+- steps del runner con `status != success`
+- diferencias sustantivas en la comparacion baseline
+
+## Warnings tolerados pero documentados
+
+- outliers de `yll_rate` asociados a denominadores muy pequenos en edades extremas
+- fallback `parquet -> csv` del mismo dataset canonico cuando el reporte puede continuar sin cambiar la ubicacion de lectura
+
+## Warnings que deben revisarse si reaparecen
+
+- reciclado de `data.table` en scripts metodologicos
+- warnings de maquetacion del Word final
+
+Registro vigente:
+
+- `docs/minor_observations_status.csv`

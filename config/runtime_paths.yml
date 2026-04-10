@@ -1,0 +1,10 @@
+raw_root: ""
+external_root: ""
+
+inputs:
+  sinadef_dir: ""
+
+external_dataset_overrides:
+  population_result: ""
+  life_table_mortality_single_age: ""
+  life_table_standard_single_age: ""

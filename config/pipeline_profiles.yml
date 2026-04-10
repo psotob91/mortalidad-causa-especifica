@@ -1,0 +1,17 @@
+profiles:
+  full:
+    description: "Core + methods + reports"
+    include_columns:
+      - profile_full
+  core:
+    description: "Solo pipeline core bloqueante"
+    include_columns:
+      - profile_core
+  methods:
+    description: "Solo capas metodologicas derivadas"
+    include_columns:
+      - profile_methods
+  reports:
+    description: "Solo salidas editoriales y reportes"
+    include_columns:
+      - profile_reports

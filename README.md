@@ -1,252 +1,77 @@
-# mortalidad-causa-especifica
+# Mortalidad y AVP por causa especifica en Peru, 2018-2024
 
+Pipeline reproducible para construir mortalidad causa-especifica y AVP/YLL a partir de registros de defuncion, con redistribucion de *garbage codes*, ajuste por completitud, reconciliacion jerarquica y capa final de reportes.
 
-- [Mortalidad por causa específica en Perú,
-  2018-2024](#mortalidad-por-causa-específica-en-perú-2018-2024)
-  - [Resumen](#resumen)
-  - [Alcance del pipeline](#alcance-del-pipeline)
-  - [Principios de reproducibilidad](#principios-de-reproducibilidad)
-  - [Qué sí se versiona en GitHub](#qué-sí-se-versiona-en-github)
-    - [1) Código fuente](#1-código-fuente)
-    - [2) Configuración y contratos](#2-configuración-y-contratos)
-    - [3) Insumos públicos necesarios para
-      reconstrucción](#3-insumos-públicos-necesarios-para-reconstrucción)
-    - [4) Documentación estructural](#4-documentación-estructural)
-    - [5) Infraestructura reproducible](#5-infraestructura-reproducible)
-  - [Qué no se debe versionar](#qué-no-se-debe-versionar)
-    - [Datos confidenciales](#datos-confidenciales)
-    - [Outputs derivados](#outputs-derivados)
-    - [Archivos temporales o locales](#archivos-temporales-o-locales)
-  - [Dependencias externas del
-    proyecto](#dependencias-externas-del-proyecto)
-  - [Estructura general sugerida](#estructura-general-sugerida)
-  - [Orden lógico de ejecución](#orden-lógico-de-ejecución)
-  - [Seguridad y gobernanza de datos](#seguridad-y-gobernanza-de-datos)
-  - [Cómo reconstruir resultados](#cómo-reconstruir-resultados)
-  - [Estado recomendado del repositorio
-    público](#estado-recomendado-del-repositorio-público)
-  - [Licencia](#licencia)
-  - [Contacto / autoría](#contacto--autoría)
+## Que hace este proyecto
 
-# Mortalidad por causa específica en Perú, 2018-2024
+El flujo analitico cubre cinco bloques:
 
-Pipeline reproducible para ingestión, normalización, mapeo,
-redistribución de *garbage codes*, corrección por completitud,
-modelamiento de tasas de mortalidad por causa, reconciliación jerárquica
-y cálculo de AVP/YLL para el estudio nacional de carga de enfermedad del
-Perú.
+- ingesta y normalizacion de registros de defuncion;
+- construccion del maestro de causas y reglas de redistribucion;
+- estimacion de mortalidad final, tasas y reconciliacion;
+- calculo de AVP/YLL;
+- generacion de tablas, QC y reportes.
 
-## Resumen
+La logica metodologica vigente no vive en este README sino en:
 
-Este repositorio implementa un flujo analítico orientado a estimar
-mortalidad causa-específica y AVP/YLL con una arquitectura reproducible
-basada en:
+- `AGENTS.md`
+- `maestros/00_MASTER_INSTRUCCIONES_PROYECTO.txt`
+- `maestros/01_MASTER_FLUJO_PIPELINE.txt`
+- `maestros/02_MASTER_REGLAS_REDISTRIBUCION.txt`
+- `maestros/03_MASTER_PANDEMIA_Y_SUBREGISTRO.txt`
+- `maestros/04_MASTER_QC.txt`
+- `maestros/05_MASTER_PROMPT_AUDITORIA_FULL_REPO.txt`
 
-- especificaciones YAML para contratos de datos;
-- utilidades modulares en `R/`;
-- artefactos tabulares versionables y auditables;
-- separación explícita entre insumos públicos, datos confidenciales y
-  salidas derivadas;
-- compatibilidad con un enfoque jerárquico tipo OMOP-like para causas y
-  metadatos.
+## Estructura operativa
 
-## Alcance del pipeline
+- `scripts/`: entrypoints operativos del pipeline.
+- `R/`: helpers compartidos.
+- `R/diagnostics/`: diagnosticos reproducibles fuera del rerun normal.
+- `R/maintenance/`: mantenimiento, auditoria y gobernanza.
+- `reports/`: constructores de productos editoriales.
+- `config/`: contratos, specs y configuracion de rutas.
+- `data/derived/qc/`: QC tabular canonico.
+- `outputs/`: auxiliares no tabulares.
 
-El flujo principal cubre:
+## Como correrlo
 
-1.  **Construcción del maestro de causas** y de la jerarquía de
-    ancestros.
-2.  **Ingesta de registros SINADEF crudos**.
-3.  **Normalización del registro individual de defunción**.
-4.  **Mapeo CIE-10 y redistribución de códigos basura**.
-5.  **Corrección por completitud y manejo del componente pandémico**.
-6.  **Roll-up jerárquico de causas**.
-7.  **Modelamiento y suavizamiento de tasas de mortalidad**.
-8.  **Reconciliación geográfica y jerárquica**.
-9.  **Cálculo de AVP/YLL**.
-10. **Construcción de tablas finales reportables**.
+La forma recomendada es:
 
-## Principios de reproducibilidad
-
-Este repositorio **sí puede ser público**, pero **no debe incluir datos
-individuales confidenciales de SINADEF** ni salidas derivadas
-construidas a partir de dichos registros. Por tanto, la estrategia
-recomendada es:
-
-- **versionar** código, especificaciones, diccionarios, metadatos,
-  configuraciones, insumos públicos y documentación estructural;
-- **excluir** los registros individuales de defunción y cualquier
-  derivado que permita reconstrucción directa o indirecta de datos
-  sensibles;
-- **regenerar localmente** las salidas finales a partir de los insumos
-  autorizados.
-
-## Qué sí se versiona en GitHub
-
-### 1) Código fuente
-
-- `*.R`
-- carpeta `R/`
-- scripts auxiliares del proyecto
-
-### 2) Configuración y contratos
-
-- `config/*.yml`
-- `config/*.yaml`
-- `config/*.R`
-- `config/maestro_age_simple.csv`
-- `config/maestro_external_inputs.csv`
-
-### 3) Insumos públicos necesarios para reconstrucción
-
-- `data/raw/cause_mapping/`
-- `data/raw/redistribution_rules/`
-- cualquier otro subdirectorio de `data/raw/` que contenga solo
-  catálogos, maestros o fuentes públicas no sensibles
-
-### 4) Documentación estructural
-
-- `README.qmd`
-- `README.md`
-- `*.md`
-- `*.txt`
-- `tree_project.txt`
-- `Estructura-del-proyecto-actualizada.txt`
-- documentación metodológica no sensible
-
-### 5) Infraestructura reproducible
-
-Si existen en el proyecto, conviene versionar también:
-
-- `renv.lock`
-- `.Rprofile`
-- `renv/activate.R`
-- archivos CSS, SCSS, plantillas Quarto o YAML de render
-
-## Qué no se debe versionar
-
-### Datos confidenciales
-
-- `data/raw/sinadef/`
-- cualquier archivo con registros individuales identificables o
-  potencialmente reidentificables
-- exportaciones intermedias derivadas directamente del nivel individual
-
-### Outputs derivados
-
-- `data/final/`
-- `data/derived/`
-- `outputs/`
-- reportes renderizados, tablas QC, parquet, csv finales, catálogos de
-  ejecución y logs
-
-### Archivos temporales o locales
-
-- `.Rhistory`, `.RData`, `.Ruserdata`, `.Rproj.user/`
-- `*.log`, `*.tmp`, `*.bak`, `*.out`
-- carpetas de render de Quarto
-
-## Dependencias externas del proyecto
-
-Este repositorio depende de insumos externos definidos en
-`config/external_sources.yml`, por ejemplo:
-
-- población analítica de `demografia-poblacion-inei`;
-- tablas de mortalidad de referencia;
-- tabla estándar de esperanza de vida para AVP/YLL.
-
-Para reproducibilidad completa, estos repositorios o snapshots de datos
-deben estar disponibles localmente con las rutas relativas esperadas, o
-bien adaptarse el archivo `config/external_sources.yml` al entorno de
-ejecución.
-
-## Estructura general sugerida
-
-``` text
-mortalidad-causa-especifica/
-├─ R/
-├─ config/
-├─ data/
-│  ├─ raw/
-│  │  ├─ cause_mapping/
-│  │  ├─ redistribution_rules/
-│  │  └─ sinadef/        # NO versionar
-│  ├─ derived/           # NO versionar
-│  └─ final/             # NO versionar
-├─ outputs/              # NO versionar
-├─ README.qmd
-├─ README.md
-└─ .gitignore
+```powershell
+Rscript .\scripts\run_preflight_checks.R
+Rscript .\scripts\run_pipeline.R --profile full --clean-first
+Rscript .\scripts\compare_validation_baseline.R
 ```
 
-## Orden lógico de ejecución
+Tambien puedes correr perfiles parciales:
 
-El pipeline sigue aproximadamente esta secuencia:
-
-``` text
-01_build_cause_master.R
-02_build_cause_hierarchy_bridge.R
-03_build_redistribution_rules.R
-04_ingest_sinadef_raw.R
-05_normalize_death_record.R
-06_map_and_redistribute_deaths.R
-07_qc_redistribution.R
-08_build_death_cause_final.R
-08b_rollup_death_cause_final.R
-09_build_mortality_rates.R
-09b_reconcile_mortality_hierarchy.R
-10_compute_avp_yll.R
-11_build_report_tables.R
+```powershell
+Rscript .\scripts\run_pipeline.R --profile core
+Rscript .\scripts\run_pipeline.R --profile methods
+Rscript .\scripts\run_pipeline.R --profile reports
 ```
 
-## Seguridad y gobernanza de datos
+## Inputs externos y portabilidad
 
-Este repositorio está diseñado para separar claramente tres capas:
+El proyecto ya no depende de una unica ubicacion fija de `data/raw/`. Los insumos sensibles o externos pueden montarse fuera del repo y resolverse por:
 
-- **capa pública reproducible**: código, especificaciones, catálogos
-  públicos y documentación;
-- **capa sensible local**: registros individuales SINADEF y cualquier
-  insumo restringido;
-- **capa derivada regenerable**: salidas analíticas y diagnósticos QC.
+1. variables de entorno;
+2. `config/runtime_paths.yml`;
+3. fallback local del repo.
 
-En un repositorio público, la regla debe ser: **solo publicar lo
-necesario para reproducir la lógica, no los datos sensibles ni sus
-derivados directos**.
+Variables principales:
 
-## Cómo reconstruir resultados
+- `MCE_SINADEF_DIR`
+- `MCE_RAW_ROOT`
+- `MCE_EXTERNAL_ROOT`
 
-1.  Clonar este repositorio.
-2.  Ubicar localmente los insumos públicos versionados.
-3.  Colocar los datos restringidos en las rutas locales excluidas por
-    `.gitignore`.
-4.  Configurar las rutas de `external_sources.yml`.
-5.  Ejecutar los scripts en el orden del pipeline.
-6.  Verificar artefactos QC y catálogos de trazabilidad.
+## Documentacion de operacion
 
-## Estado recomendado del repositorio público
+Para montaje en servidor, Docker, permisos de lectura/escritura y ejemplos de ejecucion:
 
-Este repositorio debería contener principalmente:
+- `docs/operations_manual.md`
+- `docs/server_deployment_manual.pdf`
 
-- código fuente ejecutable;
-- contratos y diccionarios;
-- catálogos maestros públicos;
-- documentación metodológica;
-- instrucciones claras para reconstrucción local.
+## Estado del repositorio
 
-No debería contener:
-
-- SINADEF individual;
-- tablas finales derivadas de SINADEF;
-- outputs masivos de QC;
-- reportes generados automáticamente.
-
-## Licencia
-
-Mantener la licencia del repositorio remoto y agregar aquí cualquier
-precisión metodológica o de uso si fuese necesario.
-
-## Contacto / autoría
-
-**Percy Soto Becerra**  
-Consultoría y desarrollo metodológico para estudio nacional de carga de
-enfermedad del Perú.
+Esta version usa nombres canonicos semanticos en scripts y carpetas activas. Existe una rama historica de respaldo para trazabilidad tecnica, pero `main` es la unica rama recomendada para operacion.

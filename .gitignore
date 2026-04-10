@@ -88,6 +88,9 @@
 *.gz
 *.zip
 *.7z
+/backups/
+/logs/
+/dev-pandemic-oprm-audit.zip
 
 # ============================================================
 # 7. R / RSTUDIO
