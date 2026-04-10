@@ -197,9 +197,8 @@ La operacion recomendada usa:
 - `scripts/run_preflight_checks.R`
 - `scripts/run_pipeline.R`
 
-La capa semantica oficial y el mapa historico estan documentados en:
+La capa semantica oficial del runner esta documentada en:
 
-- `config/script_aliases.csv`
 - `config/pipeline_steps.csv`
 
 Esto permite operar y documentar con nombres canonicos en la estructura final limpia del repo.
@@ -232,19 +231,10 @@ Las rutas QC y auxiliares activas usan solo nombres semanticos canonicos.
 - `run_pipeline.R`
 - `script_path_canonical` en `config/pipeline_steps.csv`
 
-## Historico deprecated
+## Rama historica
 
-- `reports/deprecated/**`
-- `scripts/deprecated/**`
-- `R/diagnostics/deprecated/**`
-- `R/maintenance/deprecated/**`
-- scripts diagnosticos o de block1 fuera de la operacion vigente
-
-## Fuera de operacion
-
-- `tmp_*.R`
-- pruebas ad hoc del root
-- archivos scratch no gestionados por el runner
+- la referencia historica completa vive en la rama `deprecated/full-history`
+- `main` es la unica rama recomendada para operacion y mantenimiento corriente
 
 # Interpretacion de salidas de control
 

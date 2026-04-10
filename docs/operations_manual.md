@@ -115,8 +115,7 @@ Rscript .\scripts\run_pipeline.R --profile full --clean-first
 - `outputs`
 
 ## Scripts canonicos
-La capa semantica oficial y el mapa historico estan en:
-- `config/script_aliases.csv`
+La capa semantica oficial del runner esta en:
 - `config/pipeline_steps.csv`
 
 Los scripts canonicos son la unica interfaz oficial para operacion y documentacion futura.

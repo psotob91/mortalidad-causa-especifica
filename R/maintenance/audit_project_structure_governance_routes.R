@@ -116,7 +116,13 @@ script_inventory <- rbindlist(lapply(script_paths, function(path) {
   )
 }), fill = TRUE)
 aliases_path <- here("config", "script_aliases.csv")
-script_aliases <- if (file.exists(aliases_path)) fread(aliases_path) else data.table()
+script_aliases <- if (file.exists(aliases_path)) fread(aliases_path) else data.table(
+  legacy_script = character(),
+  canonical_script = character(),
+  phase_label = character(),
+  scope = character(),
+  status = character()
+)
 if (nrow(script_aliases) > 0L) {
   script_aliases_merge <- copy(script_aliases)[, .(
     legacy_script,

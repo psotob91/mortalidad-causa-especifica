@@ -1,19 +1,19 @@
 step_order,step_id,script_path_legacy,script_path_canonical,phase_group,profile_full,profile_core,profile_methods,profile_reports,blocking,notes,primary_dataset_id
-10,ingest_sinadef_raw,scripts/deprecated/compatibility/04_ingest_sinadef_raw.R,scripts/ingest_sinadef_raw.R,core,TRUE,TRUE,FALSE,FALSE,TRUE,Ingesta cruda de SINADEF,death_record_raw
-20,normalize_death_record,scripts/deprecated/compatibility/05_normalize_death_record.R,scripts/normalize_death_record.R,core,TRUE,TRUE,FALSE,FALSE,TRUE,Normalizacion del registro de defuncion,death_record_normalized
-30,build_cause_master,scripts/deprecated/compatibility/01_build_cause_master.R,scripts/build_cause_master.R,core,TRUE,TRUE,FALSE,FALSE,TRUE,Construccion del maestro de causas,cause_master
-40,build_cause_hierarchy_bridge,scripts/deprecated/compatibility/02_build_cause_hierarchy_bridge.R,scripts/build_cause_hierarchy_bridge.R,core,TRUE,TRUE,FALSE,FALSE,TRUE,Puente jerarquico de causas,cause_hierarchy_bridge
-50,build_redistribution_rules,scripts/deprecated/compatibility/03_build_redistribution_rules.R,scripts/build_redistribution_rules.R,core,TRUE,TRUE,FALSE,FALSE,TRUE,Reglas de redistribucion,redistribution_rules
-60,map_and_redistribute_deaths,scripts/deprecated/compatibility/06_map_and_redistribute_deaths.R,scripts/map_and_redistribute_deaths.R,core,TRUE,TRUE,FALSE,FALSE,TRUE,Mapeo y redistribucion de muertes,death_cause_leaf_post_redistribution
-70,qc_redistribution,scripts/deprecated/compatibility/07_qc_redistribution.R,scripts/qc_redistribution.R,core,TRUE,TRUE,FALSE,FALSE,TRUE,QC de redistribucion,redistribution_qc
-80,build_death_cause_final,scripts/deprecated/compatibility/08_build_death_cause_final.R,scripts/build_death_cause_final.R,core,TRUE,TRUE,FALSE,FALSE,TRUE,Mortalidad final con completitud y pandemia,death_cause_final
-90,rollup_death_cause_final,scripts/deprecated/compatibility/08b_rollup_death_cause_final.R,scripts/rollup_death_cause_final.R,core,TRUE,TRUE,FALSE,FALSE,TRUE,Roll-up jerarquico final,death_cause_final_hierarchical
-100,qc_completeness_validation,scripts/deprecated/compatibility/08c_qc_completeness_validation.R,scripts/qc_completeness_validation.R,core,TRUE,TRUE,FALSE,FALSE,TRUE,QC de completitud y plausibilidad,completeness_qc
-110,build_mortality_rates,scripts/deprecated/compatibility/09_build_mortality_rates.R,scripts/build_mortality_rates.R,core,TRUE,TRUE,FALSE,FALSE,TRUE,Tasas de mortalidad y suavizado,mortality_rate_cause_smoothed
-120,reconcile_mortality_hierarchy,scripts/deprecated/compatibility/09b_reconcile_mortality_hierarchy.R,scripts/reconcile_mortality_hierarchy.R,core,TRUE,TRUE,FALSE,FALSE,TRUE,Reconciliacion jerarquica y geografica,mortality_rate_cause_smoothed_reconciled
-130,compute_avp_yll,scripts/deprecated/compatibility/10_compute_avp_yll.R,scripts/compute_avp_yll.R,core,TRUE,TRUE,FALSE,FALSE,TRUE,Calculo de AVP/YLL,avp_yll_cause_reconciled
-140,build_report_tables,scripts/deprecated/compatibility/11_build_report_tables.R,scripts/build_report_tables.R,core,TRUE,TRUE,FALSE,FALSE,TRUE,Tablas maestras finales,report_tables
-150,build_methods_catalogs,scripts/deprecated/compatibility/12_build_methods_catalogs.R,scripts/build_methods_catalogs.R,methods,TRUE,FALSE,TRUE,FALSE,FALSE,Tablas de metodos y catalogos,methods_catalogs
-160,build_oms_reference_compare_partial,scripts/deprecated/compatibility/13_build_oms_reference_compare_partial.R,scripts/build_oms_reference_compare_partial.R,methods,TRUE,FALSE,TRUE,FALSE,FALSE,Comparacion parcial OMS vs proyecto,oms_compare_partial
-170,build_all_causes_validation_excels,reports/deprecated/all_causes_validation_excels/12e_build_all_causes_validation_excels.R,reports/all_causes_validation_excels/build_all_causes_validation_excels.R,reports,TRUE,FALSE,FALSE,TRUE,FALSE,Excels de validacion all causes,all_causes_validation_excels
-180,build_all_causes_word_report,reports/deprecated/final_word_report/12f_build_all_causes_word_report.R,reports/final_word_report/build_all_causes_word_report.R,reports,TRUE,FALSE,FALSE,TRUE,FALSE,Word report all causes,all_causes_word_report
+10,ingest_sinadef_raw,,scripts/ingest_sinadef_raw.R,core,TRUE,TRUE,FALSE,FALSE,TRUE,Ingesta cruda de SINADEF,death_record_raw
+20,normalize_death_record,,scripts/normalize_death_record.R,core,TRUE,TRUE,FALSE,FALSE,TRUE,Normalizacion del registro de defuncion,death_record_normalized
+30,build_cause_master,,scripts/build_cause_master.R,core,TRUE,TRUE,FALSE,FALSE,TRUE,Construccion del maestro de causas,cause_master
+40,build_cause_hierarchy_bridge,,scripts/build_cause_hierarchy_bridge.R,core,TRUE,TRUE,FALSE,FALSE,TRUE,Puente jerarquico de causas,cause_hierarchy_bridge
+50,build_redistribution_rules,,scripts/build_redistribution_rules.R,core,TRUE,TRUE,FALSE,FALSE,TRUE,Reglas de redistribucion,redistribution_rules
+60,map_and_redistribute_deaths,,scripts/map_and_redistribute_deaths.R,core,TRUE,TRUE,FALSE,FALSE,TRUE,Mapeo y redistribucion de muertes,death_cause_leaf_post_redistribution
+70,qc_redistribution,,scripts/qc_redistribution.R,core,TRUE,TRUE,FALSE,FALSE,TRUE,QC de redistribucion,redistribution_qc
+80,build_death_cause_final,,scripts/build_death_cause_final.R,core,TRUE,TRUE,FALSE,FALSE,TRUE,Mortalidad final con completitud y pandemia,death_cause_final
+90,rollup_death_cause_final,,scripts/rollup_death_cause_final.R,core,TRUE,TRUE,FALSE,FALSE,TRUE,Roll-up jerarquico final,death_cause_final_hierarchical
+100,qc_completeness_validation,,scripts/qc_completeness_validation.R,core,TRUE,TRUE,FALSE,FALSE,TRUE,QC de completitud y plausibilidad,completeness_qc
+110,build_mortality_rates,,scripts/build_mortality_rates.R,core,TRUE,TRUE,FALSE,FALSE,TRUE,Tasas de mortalidad y suavizado,mortality_rate_cause_smoothed
+120,reconcile_mortality_hierarchy,,scripts/reconcile_mortality_hierarchy.R,core,TRUE,TRUE,FALSE,FALSE,TRUE,Reconciliacion jerarquica y geografica,mortality_rate_cause_smoothed_reconciled
+130,compute_avp_yll,,scripts/compute_avp_yll.R,core,TRUE,TRUE,FALSE,FALSE,TRUE,Calculo de AVP/YLL,avp_yll_cause_reconciled
+140,build_report_tables,,scripts/build_report_tables.R,core,TRUE,TRUE,FALSE,FALSE,TRUE,Tablas maestras finales,report_tables
+150,build_methods_catalogs,,scripts/build_methods_catalogs.R,methods,TRUE,FALSE,TRUE,FALSE,FALSE,Tablas de metodos y catalogos,methods_catalogs
+160,build_oms_reference_compare_partial,,scripts/build_oms_reference_compare_partial.R,methods,TRUE,FALSE,TRUE,FALSE,FALSE,Comparacion parcial OMS vs proyecto,oms_compare_partial
+170,build_all_causes_validation_excels,,reports/all_causes_validation_excels/build_all_causes_validation_excels.R,reports,TRUE,FALSE,FALSE,TRUE,FALSE,Excels de validacion all causes,all_causes_validation_excels
+180,build_all_causes_word_report,,reports/final_word_report/build_all_causes_word_report.R,reports,TRUE,FALSE,FALSE,TRUE,FALSE,Word report all causes,all_causes_word_report
