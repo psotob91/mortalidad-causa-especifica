@@ -1,0 +1,33 @@
+﻿MASTER DE REGLA DE TRABAJO EN MAIN
+
+PROPOSITO
+Este documento fija una regla operativa para cualquier agente o analista que vaya a editar el checkout principal `main`.
+
+REGLA OBLIGATORIA
+Antes de editar cualquier archivo en `main`, registrar el commit de arranque del trabajo.
+
+COMANDO RECOMENDADO
+- `git rev-parse --short HEAD`
+
+QUE HACER CON ESE COMMIT
+- mencionarlo en la primera nota de trabajo o primer update al usuario
+- mencionarlo en el cierre final del trabajo
+- usarlo como punto de retorno si algo sale mal
+
+EJEMPLO
+- Commit de arranque: `f21a393`
+- Si el trabajo rompe algo, ese es el primer punto claro al que conviene volver o comparar
+
+CUANDO APLICA
+- cualquier parche o cambio en `main`
+- cualquier iteracion documental sobre `main`
+- cualquier cambio operativo o metodologico en `main`
+
+POR QUE EXISTE ESTA REGLA
+Porque `main` es la rama operativa limpia del proyecto. Registrar el commit de arranque reduce ambiguedad y hace mucho mas facil retroceder, comparar o auditar lo que se hizo.
+
+REGLA COMPLEMENTARIA
+Si el cambio va a tocar logica operativa, tambien conviene registrar:
+- que scripts se van a tocar
+- que QC posterior se espera correr
+- si el cambio requiere rerun parcial o rerun completo

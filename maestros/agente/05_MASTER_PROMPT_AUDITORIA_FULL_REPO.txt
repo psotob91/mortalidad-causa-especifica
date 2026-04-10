@@ -1,4 +1,4 @@
-MASTER PROMPT DE AUDITORIA INTEGRAL DEL REPO
+﻿MASTER PROMPT DE AUDITORIA INTEGRAL DEL REPO
 
 PROPOSITO
 Este documento define el protocolo maestro para auditar integralmente el repositorio de mortalidad por causa especifica y AVP, desde el primer script productivo hasta el ultimo artefacto derivado relevante.
@@ -34,12 +34,12 @@ PRIORIDAD DE FUENTES
 
 REGLAS OBLIGATORIAS
 1. Antes de revisar cualquier script, verificar siempre:
-   - AGENTS.md
-   - maestros/00_MASTER_INSTRUCCIONES_PROYECTO.txt
-   - maestros/01_MASTER_FLUJO_PIPELINE.txt
-   - maestros/02_MASTER_REGLAS_REDISTRIBUCION.txt
-   - maestros/03_MASTER_PANDEMIA_Y_SUBREGISTRO.txt
-   - maestros/04_MASTER_QC.txt
+   - Agents.md
+   - maestros/metodologia/00_MASTER_INSTRUCCIONES_PROYECTO.txt
+   - maestros/metodologia/01_MASTER_FLUJO_PIPELINE.txt
+   - maestros/metodologia/02_MASTER_REGLAS_REDISTRIBUCION.txt
+   - maestros/metodologia/03_MASTER_PANDEMIA_Y_SUBREGISTRO.txt
+   - maestros/metodologia/04_MASTER_QC.txt
 2. Para cualquier archivo tecnico:
    - si esta adjuntado en el chat, prima ese archivo
    - si no esta adjuntado, usar la version del repo
@@ -68,20 +68,20 @@ ALCANCE DE LA AUDITORIA
 
 PIPELINE CORE BLOQUEANTE
 Se considera pipeline core bloqueante el contenido productivo principal de:
-- scripts/01_build_cause_master.R
-- scripts/02_build_cause_hierarchy_bridge.R
-- scripts/03_build_redistribution_rules.R
-- scripts/04_ingest_sinadef_raw.R
-- scripts/05_normalize_death_record.R
-- scripts/06_map_and_redistribute_deaths.R
-- scripts/07_qc_redistribution.R
-- scripts/08_build_death_cause_final.R
-- scripts/08b_rollup_death_cause_final.R
-- scripts/08c_qc_completeness_validation.R
-- scripts/09_build_mortality_rates.R
-- scripts/09b_reconcile_mortality_hierarchy.R
-- scripts/10_compute_avp_yll.R
-- scripts/11_build_report_tables.R
+- scripts/build_cause_master.R
+- scripts/build_cause_hierarchy_bridge.R
+- scripts/build_redistribution_rules.R
+- scripts/ingest_sinadef_raw.R
+- scripts/normalize_death_record.R
+- scripts/map_and_redistribute_deaths.R
+- scripts/qc_redistribution.R
+- scripts/build_death_cause_final.R
+- scripts/rollup_death_cause_final.R
+- scripts/qc_completeness_validation.R
+- scripts/build_mortality_rates.R
+- scripts/reconcile_mortality_hierarchy.R
+- scripts/compute_avp_yll.R
+- scripts/build_report_tables.R
 
 CAPA ANEXA NO CORE
 Se consideran anexos no-core, auditables pero no necesariamente bloqueantes por si mismos:
@@ -196,12 +196,12 @@ MAPEO OPERATIVO DEL REPO REAL
 Usar esta traduccion entre fases de auditoria y scripts reales del repo:
 
 FASE 0
-- AGENTS.md
-- maestros/00_MASTER_INSTRUCCIONES_PROYECTO.txt
-- maestros/01_MASTER_FLUJO_PIPELINE.txt
-- maestros/02_MASTER_REGLAS_REDISTRIBUCION.txt
-- maestros/03_MASTER_PANDEMIA_Y_SUBREGISTRO.txt
-- maestros/04_MASTER_QC.txt
+- Agents.md
+- maestros/metodologia/00_MASTER_INSTRUCCIONES_PROYECTO.txt
+- maestros/metodologia/01_MASTER_FLUJO_PIPELINE.txt
+- maestros/metodologia/02_MASTER_REGLAS_REDISTRIBUCION.txt
+- maestros/metodologia/03_MASTER_PANDEMIA_Y_SUBREGISTRO.txt
+- maestros/metodologia/04_MASTER_QC.txt
 - scripts/
 - R/
 - config/
@@ -209,48 +209,48 @@ FASE 0
 - reports/
 
 FASE 1
-- scripts/04_ingest_sinadef_raw.R
+- scripts/ingest_sinadef_raw.R
 - config/spec_death_record_raw.yml
 
 FASE 2
-- scripts/05_normalize_death_record.R
+- scripts/normalize_death_record.R
 - config/spec_death_record_normalized.yml
 
 FASE 3
-- scripts/01_build_cause_master.R
-- scripts/02_build_cause_hierarchy_bridge.R
+- scripts/build_cause_master.R
+- scripts/build_cause_hierarchy_bridge.R
 - config/spec_cause_master.yml
 
 FASE 4
-- scripts/03_build_redistribution_rules.R
+- scripts/build_redistribution_rules.R
 - config/spec_redistribution_rules.yml
 
 FASE 5
-- scripts/06_map_and_redistribute_deaths.R
+- scripts/map_and_redistribute_deaths.R
 
 FASE 6
-- scripts/07_qc_redistribution.R
+- scripts/qc_redistribution.R
 
 FASE 7
-- scripts/08_build_death_cause_final.R
+- scripts/build_death_cause_final.R
 - config/spec_death_cause_final.yml
 - config/external_sources.yml
 
 FASE 8
-- scripts/08b_rollup_death_cause_final.R
-- scripts/08c_qc_completeness_validation.R
+- scripts/rollup_death_cause_final.R
+- scripts/qc_completeness_validation.R
 
 FASE 9
-- scripts/09_build_mortality_rates.R
+- scripts/build_mortality_rates.R
 
 FASE 10
-- scripts/09b_reconcile_mortality_hierarchy.R
+- scripts/reconcile_mortality_hierarchy.R
 
 FASE 11
-- scripts/10_compute_avp_yll.R
+- scripts/compute_avp_yll.R
 
 FASE 12
-- scripts/11_build_report_tables.R
+- scripts/build_report_tables.R
 - R/diagnostics/12*
 - R/diagnostics/13*
 - reports/**/12*
@@ -439,7 +439,7 @@ GATES DE AVANCE OBLIGATORIOS
 
 GATE FUNDACIONAL 0
 No se puede iniciar auditoria secuencial si no se completo:
-- lectura de AGENTS.md
+- lectura de Agents.md
 - lectura de 00 a 04 MASTER_*.txt
 - mapeo del pipeline real
 - identificacion de scripts, specs, utils y dependencias externas
@@ -750,11 +750,11 @@ Este MASTER queda bien construido si:
 
 INSTRUCCION FINAL DE USO
 Cuando se solicite una auditoria integral del repo, usar este documento como guia principal de trabajo, complementandolo con:
-- maestros/00_MASTER_INSTRUCCIONES_PROYECTO.txt
-- maestros/01_MASTER_FLUJO_PIPELINE.txt
-- maestros/02_MASTER_REGLAS_REDISTRIBUCION.txt
-- maestros/03_MASTER_PANDEMIA_Y_SUBREGISTRO.txt
-- maestros/04_MASTER_QC.txt
+- maestros/metodologia/00_MASTER_INSTRUCCIONES_PROYECTO.txt
+- maestros/metodologia/01_MASTER_FLUJO_PIPELINE.txt
+- maestros/metodologia/02_MASTER_REGLAS_REDISTRIBUCION.txt
+- maestros/metodologia/03_MASTER_PANDEMIA_Y_SUBREGISTRO.txt
+- maestros/metodologia/04_MASTER_QC.txt
 
 Si existe conflicto:
 - priorizar archivos adjuntos del chat
@@ -766,3 +766,4 @@ Si algo no esta definido:
 - explicitar la laguna
 - proponer solucion concreta
 - solicitar definicion solo si la ambiguedad cambia la decision metodologica
+

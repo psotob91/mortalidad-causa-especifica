@@ -1,0 +1,47 @@
+﻿MASTER DE RUTAS DE TRABAJO HUMANO Y AGENTE
+
+PROPOSITO
+Este documento explica dos formas legitimas de trabajar con el proyecto: la ruta clasica del analista y la ruta asistida por un agente Codex.
+
+RUTA 1. TRABAJO CLASICO DEL ANALISTA
+Usa esta ruta si prefieres entender y correr el proyecto por tu cuenta.
+
+ORDEN RECOMENDADO
+1. `README.md`
+2. `docs/quickstart_first_use.md`
+3. `docs/operations_manual.md`
+4. `docs/server_deployment_manual.pdf` si necesitas mas detalle
+5. `maestros/README_MAESTROS.md` si luego quieres entrar a la metodologia completa
+
+QUE ENCONTRARAS AHI
+- en `README.md`: mapa general y entrada rapida
+- en la quickstart: la secuencia minima para primer uso
+- en el manual operativo: configuracion de rutas y ejemplos paso a paso
+- en el PDF: version mas pedagógica y completa
+- en los maestros: reglas sustantivas y QC del proyecto
+
+RUTA 2. TRABAJO ASISTIDO POR AGENTE CODEX
+Usa esta ruta si quieres apoyarte en un agente para entender, auditar, extender o empaquetar resultados.
+
+ORDEN RECOMENDADO
+1. `Agents.md`
+2. `maestros/README_MAESTROS.md`
+3. metodologia `00-04`
+4. luego la capa adicional segun la tarea
+
+SEGUN TAREA
+- si quieres correr el pipeline: manuales operativos
+- si quieres auditar: `agente/05_MASTER_PROMPT_AUDITORIA_FULL_REPO.txt`
+- si quieres nuevas tablas, figuras o manuscrito: `continuidad/08_MASTER_REPORTING_Y_PUBLICACION.txt`
+
+EJEMPLOS DE ARRANQUE CON AGENTE
+- "Lee `Agents.md`, el indice de maestros y la ruta de reporting; luego propon una bateria de figuras elegantes para publicacion."
+- "Lee metodologia `00-04` y revisa si una tabla regional nueva respeta jerarquia, AVP y QC."
+- "Lee la ruta operativa y ayudame a configurar `runtime_paths.yml` para correr en Windows."
+
+CUANDO CONVIENE CADA RUTA
+- ruta clasica: cuando quieres entender el proyecto paso a paso y correrlo manualmente
+- ruta con agente: cuando quieres ganar velocidad, ordenar una auditoria, generar nuevos productos o preparar una extension del proyecto
+
+REGLA PRACTICA
+Ambas rutas deben converger en la misma metodologia. El agente no reemplaza los maestros; ayuda a navegar, verificar y ejecutar mejor.

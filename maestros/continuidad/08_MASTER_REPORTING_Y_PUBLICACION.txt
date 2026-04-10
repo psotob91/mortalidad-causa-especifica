@@ -1,0 +1,53 @@
+﻿MASTER DE REPORTING Y PUBLICACION
+
+PROPOSITO
+Este documento orienta trabajos futuros de tablas elegantes, figuras, paneles de resultados e informes reproducibles basados en outputs ya reconciliados del proyecto.
+
+PRINCIPIO CENTRAL
+La capa editorial no debe romper ni reinterpretar la metodologia del pipeline. Debe consumir outputs productivos y QC ya validados.
+
+QUE DEBE USARSE COMO BASE
+- `data/final/` para tablas productivas finales
+- `data/derived/qc/` para validaciones y consistencia
+- `reports/` para constructores editoriales existentes
+- `R/diagnostics/` para apoyos visuales o analiticos reutilizables
+
+QUE NO DEBE HACERSE
+- no recalcular metodologia sustantiva dentro del informe
+- no inventar reconciliaciones que debieron ocurrir upstream
+- no tratar diagnosticos auxiliares como si fueran outputs oficiales
+- no usar tablas no reconciliadas si existe una version final canonica
+
+PREGUNTAS GUIA PARA UN NUEVO ANALISTA O AGENTE
+Antes de construir un set nuevo de tablas o figuras, responder:
+1. cual es el output final canonico que se va a usar
+2. que QC demuestra que ese output esta validado
+3. que nivel de agregacion es sustantivamente correcto
+4. si el producto es descriptivo, diagnostico o publicable
+
+RUTA RECOMENDADA PARA UN NUEVO PAQUETE DE REPORTING
+1. leer metodologia base `00-04`
+2. revisar este documento
+3. identificar los datasets finales relevantes en `data/final/`
+4. revisar QCs asociados en `data/derived/qc/`
+5. revisar constructores existentes en `reports/`
+6. definir producto objetivo: tabla, figura, anexo o manuscrito reproducible
+
+EJEMPLOS DE TAREAS VALIDAS
+- construir una serie de figuras nacionales y regionales para publicacion
+- crear tablas resumidas por sexo, edad y nivel jerarquico
+- preparar un anexo reproducible para validacion metodologica
+- redisenar el informe final con mejor narrativa visual sin tocar calculos upstream
+
+EJEMPLOS DE ARRANQUE CON AGENTE
+- "Lee metodologia `00-04`, este maestro de reporting y los scripts en `reports/`; luego propón un set de figuras elegantes para un informe publicable."
+- "Ubica los outputs finales reconciliados y su QC asociado; luego diseña una tabla nacional y una regional listas para manuscrito."
+- "Revisa `reports/` y `R/diagnostics/` y separa claramente que sirve para producto editorial y que sirve solo para diagnostico."
+
+CRITERIO DE CALIDAD EDITORIAL
+Un producto nuevo queda bien planteado si:
+- usa outputs finales canonicos
+- explicita que nivel geografico y causal usa
+- puede rastrearse a un QC vigente
+- no contradice la narrativa metodologica del proyecto
+- mejora claridad, no complejidad innecesaria

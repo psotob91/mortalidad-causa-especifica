@@ -1,0 +1,61 @@
+﻿MASTER DE ONBOARDING DEL PROYECTO
+
+PROPOSITO
+Este documento ayuda a un analista nuevo o a un agente nuevo a entrar rapido al proyecto sin tener que deducir por ensayo y error que leer primero.
+
+QUE ES ESTE PROYECTO
+Es un pipeline reproducible para construir mortalidad por causa especifica y AVP/YLL a partir de registros de defuncion, con redistribucion de garbage codes, ajuste por completitud, reconciliacion jerarquica y una capa final de reportes.
+
+QUE DEBES ENTENDER PRIMERO
+1. Que los scripts operativos estan en `scripts/`
+2. Que los helpers compartidos estan en `R/`
+3. Que los diagnosticos reutilizables estan en `R/diagnostics/`
+4. Que los constructores editoriales estan en `reports/`
+5. Que los contratos y rutas viven en `config/`
+6. Que el QC tabular canonico vive en `data/derived/qc/`
+
+ORDEN RECOMENDADO DE ENTRADA
+1. `README.md`
+2. `Agents.md`
+3. `maestros/README_MAESTROS.md`
+4. metodologia `00-04`
+5. luego la ruta documental segun la tarea
+
+SI TU META ES CORRER EL PIPELINE
+Lee:
+- `docs/quickstart_first_use.md`
+- `docs/operations_manual.md`
+- `docs/server_deployment_manual.pdf` si tu caso de rutas es especial
+
+SI TU META ES ENTENDER LA METODOLOGIA
+Lee:
+- `metodologia/00_MASTER_INSTRUCCIONES_PROYECTO.txt`
+- `metodologia/01_MASTER_FLUJO_PIPELINE.txt`
+- `metodologia/02_MASTER_REGLAS_REDISTRIBUCION.txt`
+- `metodologia/03_MASTER_PANDEMIA_Y_SUBREGISTRO.txt`
+- `metodologia/04_MASTER_QC.txt`
+
+SI TU META ES HACER UN ANALISIS NUEVO O UN PARCHE
+Lee:
+- base metodologica `00-04`
+- `agente/05_MASTER_PROMPT_AUDITORIA_FULL_REPO.txt` si el cambio toca logica o consistencia global
+- luego scripts reales del area afectada
+
+SI TU META ES HACER FIGURAS, TABLAS O UN INFORME
+Lee:
+- base metodologica `00-04`
+- `continuidad/07_MASTER_RUTAS_TRABAJO_HUMANO_Y_AGENTE.txt`
+- `continuidad/08_MASTER_REPORTING_Y_PUBLICACION.txt`
+
+SALIDAS QUE DEBES MIRAR PARA ENTENDER EL ESTADO DEL PROYECTO
+- `data/derived/qc/run_pipeline/preflight_checks.csv`
+- `data/derived/qc/run_pipeline/pipeline_run_log.csv`
+- `data/derived/qc/baseline_compare/qc_baseline_vs_rerun_summary.csv`
+- `data/final/` para outputs productivos
+- `reports/` para artefactos editoriales
+
+IDEA CENTRAL
+No necesitas leer todo de golpe. El proyecto ya esta organizado para entrar por capas:
+- primero operacion
+- luego metodologia
+- luego auditoria o continuidad

@@ -1,4 +1,4 @@
----
+﻿---
 title: "Manual de montaje y operacion del pipeline"
 subtitle: "Mortalidad y AVP por causa especifica"
 format:
@@ -13,52 +13,149 @@ execute:
   message: false
 ---
 
-# Objetivo
+# Para que sirve este manual
 
-Este manual describe como montar y ejecutar el proyecto en:
+Este manual esta escrito para una persona con perfil informatico basico que necesita montar el proyecto por primera vez en una laptop, una PC Windows, un servidor o un contenedor.
 
-- laptop local
-- servidor nuevo
-- contenedor Docker
+La idea principal es muy simple:
 
-La meta es que un analista pueda cambiar un solo punto de configuracion para localizar el raw y los datasets externos, correr el preflight, ejecutar el pipeline y validar resultados sin editar scripts metodologicos.
+- el proyecto puede leer el `raw` y los datasets externos desde cualquier ubicacion;
+- los resultados se escriben dentro del repo;
+- tu solo debes decirle al proyecto donde estan esos insumos.
 
-# Arquitectura operativa
+No necesitas editar scripts metodologicos para cambiar rutas.
 
-## Que queda dentro del repositorio
+# Dos formas de entrar al proyecto
 
-- codigo del pipeline
-- configuracion del proyecto
-- outputs derivados y finales
-- reportes
-- baseline de validacion
+## Ruta 1. Trabajo clasico del analista
 
-## Que puede vivir fuera del repositorio
+Si quieres correr el pipeline sin depender de un agente:
 
-- raw SINADEF
-- datasets externos declarados en `config/external_sources.yml`
-- raw montado en disco protegido o ruta de solo lectura
+1. `README.md`
+2. `docs/quickstart_first_use.md`
+3. `docs/operations_manual.md`
+4. este PDF solo si necesitas una guia mas extensa
+5. `maestros/README_MAESTROS.md` cuando quieras entrar a la metodologia completa
 
-## Principios
+## Ruta 2. Trabajo asistido por agente Codex
 
-- los inputs externos se tratan como inmutables
-- los outputs se escriben dentro del proyecto
-- la resolucion de paths se hace desde un helper central
-- no se deben editar scripts metodologicos para cambiar rutas
+Si quieres que un agente te ayude a entender, auditar o extender el proyecto:
 
-# Punto unico de configuracion
+1. `Agents.md`
+2. `maestros/README_MAESTROS.md`
+3. metodologia `00-04`
+4. luego la ruta adicional segun la tarea
 
-La resolucion de inputs sigue esta precedencia:
+Segun tarea:
+- operar pipeline: manuales operativos
+- auditar o corregir: `maestros/agente/05_MASTER_PROMPT_AUDITORIA_FULL_REPO.txt`
+- crear tablas, figuras o manuscrito: `maestros/continuidad/08_MASTER_REPORTING_Y_PUBLICACION.txt`
+- continuar trabajo reciente o abrir un hilo nuevo sobre `main`: `maestros/continuidad/09_MASTER_CONTEXTO_MIGRACION_Y_ESTADO_ACTUAL.txt` y `maestros/continuidad/10_MASTER_REGLA_TRABAJO_EN_MAIN.txt`
+
+Ejemplo breve de prompt:
+
+- "Lee `Agents.md`, el indice de maestros y la ruta de reporting; luego propon una bateria de figuras elegantes para publicacion."
+
+# Regla general de resolucion de rutas
+
+El proyecto busca las rutas en este orden:
 
 1. variables de entorno
 2. `config/runtime_paths.yml`
-3. fallback al layout local del repo
+3. fallback local del repo
 
-## Archivo principal
+Esto significa lo siguiente:
 
-- `config/runtime_paths.yml`
+- si defines una variable de entorno, esa variable tiene prioridad;
+- si no defines variable, se usa `config/runtime_paths.yml`;
+- si ambos estan vacios, el proyecto intenta usar el layout interno esperado del repo.
 
-Contenido esperado:
+# Antes de empezar
+
+Antes de tocar ningun archivo, confirma estas cuatro cosas:
+
+- [ ] ya se donde esta la carpeta de `sinadef`
+- [ ] ya se donde estan los datasets externos principales
+- [ ] ya decidi si usare variables de entorno o `runtime_paths.yml`
+- [ ] tengo permiso de lectura sobre inputs y escritura sobre outputs
+
+# Paso 1. Decide que caso te corresponde
+
+Usa esta tabla simple.
+
+| Caso | Donde esta `sinadef` | Donde estan los externos | Recomendacion |
+|---|---|---|---|
+| **Caso A** | Fuera del repo | Fuera del repo | Usar variables o `runtime_paths.yml` |
+| **Caso B** | Dentro del repo | Fuera del repo | Dejar `sinadef` interno y configurar solo externos |
+| **Caso C** | Dentro del repo | Dentro del repo | Dejar casi todo vacio y usar rutas relativas internas |
+
+# Paso 2. Entiende que ruta necesita cada cosa
+
+## Que debe ser `MCE_SINADEF_DIR`
+
+Debe apuntar a la **carpeta final** de SINADEF.
+
+Ejemplos correctos:
+
+- `D:/raw_protegido/sinadef`
+- `/mnt/protected/raw/sinadef`
+- `C:/proyectos/mortalidad-causa-especifica/data/raw/sinadef`
+
+Ejemplos incorrectos:
+
+- `D:/raw_protegido/sinadef/archivo_2022.csv`
+- `C:/proyectos/mortalidad-causa-especifica/data/raw`
+- `D:/`
+
+## Que debe ser `MCE_EXTERNAL_ROOT`
+
+Debe apuntar a una raiz desde la cual tengan sentido los paths declarados en `config/external_sources.yml`.
+
+Hoy los externos principales son:
+
+- `population_result`
+- `life_table_mortality_single_age`
+- `life_table_standard_single_age`
+
+En `config/external_sources.yml` veras rutas como estas:
+
+- `../demografia-poblacion-inei/data/final/population_inei/population_result.parquet`
+- `../tabla-mortalidad-peru/data/final/life_table_mortality/single_age/ref_life_table_mortality_single_age.csv`
+- `../tabla-vida-estandar/data/final/standard_life_table/life_table_standard_reference_single_age.rds`
+
+Si tu organizacion de carpetas es distinta, puedes usar overrides puntuales en `runtime_paths.yml`.
+
+# Paso 3. Como encontrar las rutas en disco
+
+## En Windows
+
+1. Abre el Explorador.
+2. Entra a la carpeta que quieres usar.
+3. Haz clic en la barra de direccion.
+4. Copia la ruta completa.
+5. Pegala en PowerShell o en `runtime_paths.yml`.
+
+Ejemplo practico:
+
+- si abres `D:\repos_datos\demografia-poblacion-inei\data\final\population_inei`, esa es la ruta real de la carpeta.
+
+## En Linux o servidor
+
+1. Abre la terminal.
+2. Entra a la carpeta con `cd`.
+3. Ejecuta `pwd`.
+4. Copia la ruta completa.
+
+Ejemplo:
+
+```bash
+cd /mnt/projects/demografia-poblacion-inei/data/final/population_inei
+pwd
+```
+
+# Paso 4. Entiende `config/runtime_paths.yml`
+
+El archivo actual es este:
 
 ```yaml
 raw_root: ""
@@ -73,141 +170,369 @@ external_dataset_overrides:
   life_table_standard_single_age: ""
 ```
 
-## Variables de entorno soportadas
+## Que significa cada campo
 
-### Raw principal
+### `raw_root`
 
-- `MCE_SINADEF_DIR`
-- `MCE_RAW_ROOT`
+**LLENAR** si quieres apuntar a una carpeta madre que contiene `sinadef`.
 
-### Datasets externos
+**DEJAR EN BLANCO** si:
 
-- `MCE_EXTERNAL_ROOT`
-- `MCE_EXT_POPULATION_RESULT_PATH`
-- `MCE_EXT_LIFE_TABLE_MORTALITY_SINGLE_AGE_PATH`
-- `MCE_EXT_LIFE_TABLE_STANDARD_SINGLE_AGE_PATH`
+- usaras `MCE_SINADEF_DIR`, o
+- `data/raw/sinadef/` ya vive dentro del repo.
 
-## Regla practica
+### `external_root`
 
-Si el raw esta en otro disco o montaje protegido:
+**LLENAR** si quieres usar una raiz comun para los externos.
 
-- montar el raw
-- definir `MCE_SINADEF_DIR` o `MCE_RAW_ROOT`
-- definir `MCE_EXTERNAL_ROOT` si los externos tambien viven fuera del repo
-- correr preflight
+**DEJAR EN BLANCO** si:
 
-# Requisitos de sistema
+- usaras `MCE_EXTERNAL_ROOT`, o
+- todos tus externos ya viven dentro del repo, o
+- usaras overrides puntuales.
 
-- R disponible en linea de comandos
-- Quarto instalado
-- permisos de lectura sobre raw y externos
-- permisos de escritura sobre:
-  - `data/final`
-  - `data/derived`
-  - `data/_catalog`
-  - `reports`
-  - `outputs`
+### `inputs.sinadef_dir`
 
-Directorios recomendados de solo lectura:
+**LLENAR** solo si quieres apuntar directamente a la carpeta final de SINADEF.
 
-- raw externo
-- datasets externos
+**DEJAR EN BLANCO** si `raw_root` ya resuelve `sinadef` correctamente o si usaras `MCE_SINADEF_DIR`.
 
-# Procedimiento paso a paso
+### `external_dataset_overrides.*`
 
-## 1. Clonar y ubicar el proyecto
+**LLENAR** solo si un dataset externo esta en una ubicacion especial y no sigue el layout comun.
 
-Ubicar el repo en un directorio escribible del servidor o contenedor.
+**DEJAR EN BLANCO** si `external_root` o `MCE_EXTERNAL_ROOT` ya resuelven bien la ruta.
 
-## 2. Montar el raw y externos
+# Paso 5. Que llenar y que dejar en blanco segun tu caso
 
-Ejemplo Linux/Docker:
+## Caso A. Raw fuera del repo y externos fuera del repo
+
+Este es el caso mas comun en servidor, Docker o instalaciones institucionales.
+
+### Opcion recomendada: variables de entorno
+
+```powershell
+$env:MCE_SINADEF_DIR="D:/raw_protegido/sinadef"   # **LLENAR** con la carpeta final de sinadef
+$env:MCE_EXTERNAL_ROOT="D:/repos_datos"           # **LLENAR** con la raiz comun de externos
+```
+
+En este caso, deja `config/runtime_paths.yml` completamente vacio:
+
+```yaml
+raw_root: ""                                      # **DEJAR EN BLANCO**
+external_root: ""                                 # **DEJAR EN BLANCO**
+
+inputs:
+  sinadef_dir: ""                                 # **DEJAR EN BLANCO**
+
+external_dataset_overrides:
+  population_result: ""                           # **DEJAR EN BLANCO**
+  life_table_mortality_single_age: ""             # **DEJAR EN BLANCO**
+  life_table_standard_single_age: ""              # **DEJAR EN BLANCO**
+```
+
+### Opcion alternativa: solo YAML
+
+```yaml
+raw_root: "D:/raw_protegido"                      # **LLENAR** si `sinadef` vive bajo esta raiz
+external_root: "D:/repos_datos"                   # **LLENAR** con la raiz comun de externos
+
+inputs:
+  sinadef_dir: ""                                 # **DEJAR EN BLANCO** si raw_root ya resuelve sinadef
+
+external_dataset_overrides:
+  population_result: ""                           # **DEJAR EN BLANCO**
+  life_table_mortality_single_age: ""             # **DEJAR EN BLANCO**
+  life_table_standard_single_age: ""              # **DEJAR EN BLANCO**
+```
+
+## Caso B. Raw dentro del repo y externos fuera del repo
+
+Este caso es comun en una PC de trabajo donde solo el raw principal esta embebido en el proyecto.
+
+Supongamos esto:
+
+- `sinadef` esta en `data/raw/sinadef`
+- los externos viven en `D:/repos_datos`
+
+### Configuracion recomendada
+
+```powershell
+$env:MCE_EXTERNAL_ROOT="D:/repos_datos"           # **LLENAR**
+```
+
+Y deja `runtime_paths.yml` asi:
+
+```yaml
+raw_root: ""                                      # **DEJAR EN BLANCO** porque sinadef esta dentro del repo
+external_root: ""                                 # **DEJAR EN BLANCO** si ya usas MCE_EXTERNAL_ROOT
+
+inputs:
+  sinadef_dir: ""                                 # **DEJAR EN BLANCO**
+
+external_dataset_overrides:
+  population_result: ""                           # **DEJAR EN BLANCO**
+  life_table_mortality_single_age: ""             # **DEJAR EN BLANCO**
+  life_table_standard_single_age: ""              # **DEJAR EN BLANCO**
+```
+
+## Caso C. Raw y externos dentro del mismo proyecto
+
+Este caso es util para una laptop, una copia autocontenida o una prueba controlada.
+
+Imagina este layout:
+
+```text
+mortalidad-causa-especifica/
+  data/
+    raw/
+      sinadef/
+  externos/
+    demografia-poblacion-inei/
+    tabla-mortalidad-peru/
+    tabla-vida-estandar/
+```
+
+### Opcion practica con overrides puntuales
+
+```yaml
+raw_root: ""                                      # **DEJAR EN BLANCO**
+external_root: ""                                 # **DEJAR EN BLANCO**
+
+inputs:
+  sinadef_dir: ""                                 # **DEJAR EN BLANCO** porque se usara data/raw/sinadef del repo
+
+external_dataset_overrides:
+  population_result: "externos/demografia-poblacion-inei/data/final/population_inei/population_result.parquet"            # **LLENAR**
+  life_table_mortality_single_age: "externos/tabla-mortalidad-peru/data/final/life_table_mortality/single_age/ref_life_table_mortality_single_age.csv"  # **LLENAR**
+  life_table_standard_single_age: "externos/tabla-vida-estandar/data/final/standard_life_table/life_table_standard_reference_single_age.rds"              # **LLENAR**
+```
+
+En este caso normalmente no necesitas variables de entorno.
+
+# Paso 6. Tres ejemplos completos y guiados
+
+# Escenario 1. Servidor / Linux / Docker
+
+## Situacion
+
+- `sinadef` montado en `/mnt/protected/raw/sinadef`
+- proyectos externos montados en `/mnt/projects`
+
+## Paso a paso
+
+1. Verifica que existe `/mnt/protected/raw/sinadef`.
+2. Verifica que existen los repos o carpetas externas bajo `/mnt/projects`.
+3. Define variables de entorno.
+4. Corre preflight.
+5. Si el preflight pasa, corre el pipeline.
+
+## Comandos
 
 ```bash
 export MCE_SINADEF_DIR=/mnt/protected/raw/sinadef
 export MCE_EXTERNAL_ROOT=/mnt/projects
+Rscript ./scripts/run_preflight_checks.R
+Rscript ./scripts/run_pipeline.R --profile full --clean-first
+Rscript ./scripts/compare_validation_baseline.R
 ```
 
-Ejemplo PowerShell:
+## Que dejar en blanco
+
+Si ya usaste esas variables, deja `runtime_paths.yml` vacio.
+
+# Escenario 2. PC Windows
+
+## Situacion
+
+- `sinadef` en `D:\raw_protegido\sinadef`
+- externos en `D:\repos_datos`
+
+## Paso a paso
+
+1. Abre `D:\raw_protegido\sinadef` en el Explorador.
+2. Confirma que esa carpeta es la correcta.
+3. Abre `D:\repos_datos` y confirma que ahi viven los externos.
+4. Copia ambas rutas desde la barra de direccion.
+5. Abre PowerShell en la raiz del repo.
+6. Define las variables.
+7. Corre preflight.
+8. Si pasa, corre el pipeline.
+
+## Comandos
 
 ```powershell
-$env:MCE_SINADEF_DIR="D:\\raw_protegido\\sinadef"
-$env:MCE_EXTERNAL_ROOT="D:\\repos_datos"
+$env:MCE_SINADEF_DIR="D:/raw_protegido/sinadef"
+$env:MCE_EXTERNAL_ROOT="D:/repos_datos"
+Rscript .\scripts\run_preflight_checks.R
+Rscript .\scripts\run_pipeline.R --profile full --clean-first
+Rscript .\scripts\compare_validation_baseline.R
 ```
 
-## 3. Ejecutar preflight
+## Variante con OneDrive o ruta larga
 
-```bash
-Rscript ./scripts/run_preflight_checks.R
+```powershell
+$env:MCE_SINADEF_DIR="C:/Users/TuUsuario/OneDrive/Datos/sinadef"
+$env:MCE_EXTERNAL_ROOT="C:/Users/TuUsuario/OneDrive/ReposExternos"
 ```
 
-Revisar:
+# Escenario 3. `sinadef` dentro del mismo proyecto
+
+## Situacion
+
+- `sinadef` vive en `data/raw/sinadef`
+- quieres que el proyecto sea autocontenido
+
+## Paso a paso
+
+1. Confirma que existe `data/raw/sinadef` dentro del repo.
+2. Decide si los externos tambien estaran dentro del repo.
+3. Si los externos estaran dentro, define overrides puntuales en `runtime_paths.yml`.
+4. Corre preflight.
+5. Si pasa, corre el pipeline.
+
+## Comandos
+
+```powershell
+Rscript .\scripts\run_preflight_checks.R
+Rscript .\scripts\run_pipeline.R --profile full --clean-first
+Rscript .\scripts\compare_validation_baseline.R
+```
+
+## Que dejar en blanco
+
+```yaml
+raw_root: ""                                      # **DEJAR EN BLANCO**
+external_root: ""                                 # **DEJAR EN BLANCO** salvo que tengas una raiz interna comun
+
+inputs:
+  sinadef_dir: ""                                 # **DEJAR EN BLANCO**
+```
+
+# Paso 7. Corre siempre el preflight primero
+
+```powershell
+Rscript .\scripts\run_preflight_checks.R
+```
+
+## Que revisar
 
 - `data/derived/qc/run_pipeline/preflight_checks.csv`
 - `data/derived/qc/run_pipeline/preflight_summary.csv`
 
-Condicion de aprobacion:
+## Que significa que paso bien
 
-- sin fallos bloqueantes
+Debes ver en `ok` al menos esto:
 
-## 4. Correr el pipeline
+- `runtime_input_sinadef_dir`
+- `external_dataset_population_result`
+- `external_dataset_life_table_mortality_single_age`
+- `external_dataset_life_table_standard_single_age`
+- directorios escribibles de salida
 
-### Corrida completa
+# Paso 8. Corre el pipeline completo
 
-```bash
-Rscript ./scripts/run_pipeline.R --profile full --clean-first
+Cuando el preflight este aprobado:
+
+```powershell
+Rscript .\scripts\run_pipeline.R --profile full --clean-first
 ```
 
-### Solo core
+Tambien puedes correr por perfil:
 
-```bash
-Rscript ./scripts/run_pipeline.R --profile core
+```powershell
+Rscript .\scripts\run_pipeline.R --profile core
+Rscript .\scripts\run_pipeline.R --profile methods
+Rscript .\scripts\run_pipeline.R --profile reports
 ```
 
-### Solo metodos
+# Paso 9. Valida que todo termino bien
 
-```bash
-Rscript ./scripts/run_pipeline.R --profile methods
+Despues del pipeline, corre:
+
+```powershell
+Rscript .\scripts\compare_validation_baseline.R
 ```
 
-### Solo reportes
+## Archivos a revisar
 
-```bash
-Rscript ./scripts/run_pipeline.R --profile reports
-```
-
-## 5. Validar baseline
-
-```bash
-Rscript ./scripts/compare_validation_baseline.R
-```
-
-Revisar:
-
+- `data/derived/qc/run_pipeline/pipeline_run_log.csv`
 - `data/derived/qc/baseline_compare/qc_baseline_vs_rerun_summary.csv`
 
-Condicion de aprobacion:
+## Que debes esperar
 
-- cero diferencias sustantivas
+- todos los steps con `status = success`
+- baseline sin diferencias sustantivas
 
-# Runner y scripts canonicos
+# Errores comunes y como corregirlos
 
-La operacion recomendada usa:
+## Error 1. `sinadef` no existe
 
-- `scripts/run_preflight_checks.R`
-- `scripts/run_pipeline.R`
+**Sintoma:** falla `runtime_input_sinadef_dir`.
 
-La capa semantica oficial del runner esta documentada en:
+**Causa probable:** apuntaste a la carpeta equivocada o a un archivo.
 
-- `config/pipeline_steps.csv`
+**Como corregirlo:** vuelve a ubicar la carpeta final de `sinadef` y corrige `MCE_SINADEF_DIR`, `raw_root` o `inputs.sinadef_dir`.
 
-Esto permite operar y documentar con nombres canonicos en la estructura final limpia del repo.
+## Error 2. Falta un externo
+
+**Sintoma:** falla `external_dataset_population_result` o algun dataset requerido.
+
+**Causa probable:** `MCE_EXTERNAL_ROOT` apunta demasiado arriba o demasiado abajo, o el layout no coincide con `config/external_sources.yml`.
+
+**Como corregirlo:** revisa `config/external_sources.yml` y, si tu estructura no coincide, usa `external_dataset_overrides`.
+
+## Error 3. Llenaste a la vez `raw_root` y `sinadef_dir` con rutas distintas
+
+**Sintoma:** confusion sobre cual ruta manda.
+
+**Causa probable:** doble configuracion innecesaria.
+
+**Como corregirlo:** usa solo una estrategia. Si ya usas `MCE_SINADEF_DIR`, deja vacios `raw_root` y `sinadef_dir`.
+
+## Error 4. Usaste rutas Linux en Windows o viceversa
+
+**Sintoma:** el preflight no encuentra algo que si existe.
+
+**Causa probable:** copiaste un ejemplo del sistema operativo incorrecto.
+
+**Como corregirlo:** reemplaza la ruta por una del sistema real donde estas trabajando.
+
+## Error 5. Copiaste la ruta de un archivo cuando se esperaba una carpeta
+
+**Sintoma:** el preflight sigue fallando.
+
+**Causa probable:** usaste un `.csv`, `.parquet` o `.rds` donde se esperaba una carpeta.
+
+**Como corregirlo:** usa carpeta para `MCE_SINADEF_DIR`, `raw_root` y `external_root`. Usa archivo individual solo en `external_dataset_overrides`.
+
+# Primer uso ultra guiado
+
+Sigue este orden exacto:
+
+1. localiza `sinadef`
+2. localiza los externos principales
+3. decide si tu caso es A, B o C
+4. completa variables o `runtime_paths.yml`
+5. corre `run_preflight_checks.R`
+6. revisa `preflight_checks.csv`
+7. corre `run_pipeline.R --profile full --clean-first`
+8. corre `compare_validation_baseline.R`
+9. revisa `pipeline_run_log.csv` y `qc_baseline_vs_rerun_summary.csv`
+
+# Comandos oficiales
+
+```powershell
+Rscript .\scripts\run_preflight_checks.R
+Rscript .\scripts\run_pipeline.R --profile full --clean-first
+Rscript .\scripts\compare_validation_baseline.R
+```
 
 # Semantica de carpetas del proyecto
 
 ## Codigo
 
-- `scripts/`: entrypoints operativos de uso regular.
+- `scripts/`: entrypoints operativos que un analista corre normalmente.
 - `R/`: helpers y modulos compartidos.
 - `R/diagnostics/`: diagnosticos reproducibles fuera del rerun normal.
 - `R/maintenance/`: auditoria, gobernanza y mantenimiento no operativo diario.
@@ -220,67 +545,20 @@ Esto permite operar y documentar con nombres canonicos en la estructura final li
 - `reports/`: productos editoriales y reportables.
 - `outputs/`: auxiliares no tabulares y no editoriales.
 
-Las rutas QC y auxiliares activas usan solo nombres semanticos canonicos.
-
-# Politica de nombres
-
-## Capa oficial
-
-- scripts canonicos sin prefijo numerico
-- `run_preflight_checks.R`
-- `run_pipeline.R`
-- `script_path_canonical` en `config/pipeline_steps.csv`
-
-## Rama historica
-
-- la referencia historica completa vive en la rama `deprecated/full-history`
-- `main` es la unica rama recomendada para operacion y mantenimiento corriente
-
-# Interpretacion de salidas de control
-
-## Preflight
-
-Archivo principal:
-
-- `data/derived/qc/run_pipeline/preflight_checks.csv`
-
-Que revisar:
-
-- raw principal resuelto
-- externos obligatorios legibles
-- directorios de salida escribibles
-- baseline disponible
-
-## Corrida del pipeline
-
-Archivo principal:
-
-- `data/derived/qc/run_pipeline/pipeline_run_log.csv`
-
-Que revisar:
-
-- todos los steps con `status = success`
-- tiempos de ejecucion
-- script canonico ejecutado
-
 # Politica operativa de warnings
 
-## Warnings bloqueantes
+## Bloqueantes
 
 - fallos de preflight
 - steps del runner con `status != success`
-- diferencias sustantivas en la comparacion baseline
+- diferencias sustantivas en baseline
 
-## Warnings tolerados pero documentados
+## Tolerados pero documentados
 
-- outliers de `yll_rate` asociados a denominadores muy pequenos en edades extremas
-- fallback `parquet -> csv` del mismo dataset canonico cuando el reporte puede continuar sin cambiar la ubicacion de lectura
-
-## Warnings que deben revisarse si reaparecen
-
-- reciclado de `data.table` en scripts metodologicos
-- warnings de maquetacion del Word final
+- outliers de `yll_rate` en celdas extremas con denominadores muy pequenos
+- fallback `parquet -> csv` del mismo dataset canonico cuando el reporte puede continuar sin cambiar de fuente metodologica
 
 Registro vigente:
 
 - `docs/minor_observations_status.csv`
+

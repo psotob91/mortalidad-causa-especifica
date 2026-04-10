@@ -1,0 +1,52 @@
+﻿MASTER DE CONTEXTO DE MIGRACION Y ESTADO ACTUAL
+
+PROPOSITO
+Este documento deja memoria resumida de la gran migracion del proyecto para que nuevos analistas o nuevos agentes puedan recuperar contexto rapido sin revisar toda la historia Git ni depender de conversaciones previas.
+
+QUE CAMBIO EN LA MIGRACION
+1. Se paso de nombres numerados legacy a nombres canonicos semanticos en scripts activos.
+2. Se reorganizaron carpetas de codigo para separar mejor `scripts/`, `R/`, `R/diagnostics/`, `R/maintenance/` y `reports/`.
+3. Se formalizo una capa central de resolucion de rutas para raw y externos.
+4. Se incorporo `run_preflight_checks.R` y `run_pipeline.R` como interfaz operativa principal.
+5. Se ordeno el repo para tener una rama `main` limpia y una rama historica de respaldo.
+
+QUE SE VALIDO DURANTE LA MIGRACION
+- rerun completo del pipeline en el main operativo
+- comparacion contra baseline aprobada
+- QCs finales criticos en cero
+- preflight aprobado
+- reportes y anexos principales regenerados
+
+CAMBIOS ESTRUCTURALES CLAVE QUE AHORA SON NORMA
+- `scripts/` solo para entrypoints operativos
+- `R/` para helpers
+- `R/diagnostics/` para diagnosticos reproducibles
+- `R/maintenance/` para mantenimiento recurrente
+- `reports/` para productos editoriales
+- `data/derived/qc/` como QC tabular canonico
+- `outputs/` solo para auxiliares no tabulares
+
+CAMBIOS DE PORTABILIDAD QUE AHORA SON NORMA
+La resolucion de inputs externos sigue esta precedencia:
+1. variables de entorno
+2. `config/runtime_paths.yml`
+3. fallback local del repo
+
+Variables principales:
+- `MCE_SINADEF_DIR`
+- `MCE_RAW_ROOT`
+- `MCE_EXTERNAL_ROOT`
+
+OBSERVACIONES MENORES QUE SIGUEN VIGENTES
+- pueden aparecer outliers de `yll_rate` en celdas extremas con denominadores muy pequenos
+- existe fallback `parquet -> csv` del mismo dataset canonico en algunos reportes o diagnosticos
+- estas observaciones no invalidan la corrida, pero conviene tenerlas presentes
+
+COMO USAR ESTE CONTEXTO
+Lee este documento si:
+- acabas de abrir un hilo nuevo y no conoces la historia reciente del repo
+- vas a hacer un parche y quieres saber por que el repo quedo como quedo
+- vas a continuar trabajo de reporting, migracion o refactor
+
+NO DEBES USAR ESTE DOCUMENTO COMO FUENTE METODOLOGICA PRINCIPAL
+Las reglas sustantivas siguen viviendo en `maestros/metodologia/`.

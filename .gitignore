@@ -88,9 +88,6 @@
 *.gz
 *.zip
 *.7z
-/backups/
-/logs/
-/dev-pandemic-oprm-audit.zip
 
 # ============================================================
 # 7. R / RSTUDIO
@@ -170,6 +167,7 @@ Thumbs.db
 !README.qmd
 !README.md
 !docs/server_deployment_manual.pdf
+!docs/quickstart_first_use.pdf
 
 # ============================================================
 # 14. EXCEPCIONES EXPLÍCITAS PARA MAESTROS/DICCIONARIOS VERSIONABLES
