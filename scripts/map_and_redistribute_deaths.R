@@ -30,6 +30,10 @@ suppressPackageStartupMessages({
 source(here("R", "io_utils.R"))
 source(here("R", "catalog_utils.R"))
 
+output_suffix <- Sys.getenv("REDIST_OUTPUT_SUFFIX", unset = "")
+output_suffix_path <- if (nzchar(output_suffix)) paste0("_", output_suffix) else ""
+redis_mode <- Sys.getenv("REDIST_MODE", unset = "canonical")
+
 CFG <- list(
   version = "v1.1.3_covid_direct_priority_and_qc",
   dataset_id_leaf = "death_cause_leaf_post_redistribution",
@@ -50,12 +54,12 @@ CFG <- list(
   input_demog_incompatibility_patch_path = here("data", "raw", "redistribution_rules", "patch_direct_demographic_incompatibility_handling.csv"),
   input_direct_specific_handling_patch_path = here("data", "raw", "redistribution_rules", "patch_direct_specific_icd_handling.csv"),
   
-  out_dir_leaf = here("data", "final", "death_cause_leaf_post_redistribution"),
-  out_dir_l3   = here("data", "final", "death_cause_rollup_l3"),
-  out_dir_l2   = here("data", "final", "death_cause_rollup_l2"),
-  out_dir_l1   = here("data", "final", "death_cause_rollup_l1"),
+  out_dir_leaf = here("data", "final", paste0("death_cause_leaf_post_redistribution", output_suffix_path)),
+  out_dir_l3   = here("data", "final", paste0("death_cause_rollup_l3", output_suffix_path)),
+  out_dir_l2   = here("data", "final", paste0("death_cause_rollup_l2", output_suffix_path)),
+  out_dir_l1   = here("data", "final", paste0("death_cause_rollup_l1", output_suffix_path)),
   
-  qc_dir = qc_dir_path("map_and_redistribute_deaths"),
+  qc_dir = qc_dir_path(paste0("map_and_redistribute_deaths", output_suffix_path)),
   methods_dir = here("data", "derived", "methods"),
   
   covid_year_min = 2020L,
@@ -65,7 +69,8 @@ CFG <- list(
   unmapped_non_gc_term_id = -1L,
   gc_no_target_term_id    = -2L,
   
-  redistribution_version = "v1_1_2_fused_with_audit",
+  redistribution_version = if (nzchar(output_suffix)) paste0("v1_1_2_fused_with_audit_", output_suffix) else "v1_1_2_fused_with_audit",
+  redis_mode = redis_mode,
   verbose = TRUE
 )
 
@@ -1322,7 +1327,12 @@ tryCatch({
   qc_gc_base_without_output <- qc_gc_balance_by_group[abs(delta) > 1e-10]
   fwrite(qc_gc_base_without_output, file.path(CFG$qc_dir, "qc_gc_base_without_output.csv"))
   
-  leaf <- rbindlist(list(non_gc, gc_exp, gc_no_targets, dynamic_specific_exp), use.names = TRUE, fill = TRUE)
+  if (identical(CFG$redis_mode, "no_redistribution_delete_gc")) {
+    msg("Modo sensibilidad activo: no_redistribution_delete_gc. Se elimina la masa garbage en lugar de redistribuirla.")
+    leaf <- rbindlist(list(non_gc, dynamic_specific_exp), use.names = TRUE, fill = TRUE)
+  } else {
+    leaf <- rbindlist(list(non_gc, gc_exp, gc_no_targets, dynamic_specific_exp), use.names = TRUE, fill = TRUE)
+  }
   leaf <- leaf[, .(deaths = sum(deaths)),
                by = .(year_id, location_id, sex_id, age, cause_term_concept_id)]
   
@@ -1484,13 +1494,21 @@ tryCatch({
     ),
     deaths_post = c(
       non_gc[, sum(deaths)],
-      gc_exp[, sum(deaths)] + gc_no_targets[, sum(deaths)],
+      if (identical(CFG$redis_mode, "no_redistribution_delete_gc")) 0 else gc_exp[, sum(deaths)] + gc_no_targets[, sum(deaths)],
       0,
       leaf[, sum(deaths)]
     )
   )
   qc_balance_blocks[, delta := deaths_post - deaths_pre]
   fwrite(qc_balance_blocks, file.path(CFG$qc_dir, "qc_balance_blocks.csv"))
+  
+  qc_sensitivity_gc_deleted <- gc_base2[, .(
+    deaths_garbage_input = sum(n_deaths, na.rm = TRUE),
+    deaths_with_targets = sum(fifelse(has_targets == TRUE, n_deaths, 0), na.rm = TRUE),
+    deaths_without_targets = sum(fifelse(has_targets == FALSE, n_deaths, 0), na.rm = TRUE)
+  ), by = .(year_id, sex_id, rule_id, icd10_ucod_nodot)]
+  qc_sensitivity_gc_deleted[, redis_mode := CFG$redis_mode]
+  fwrite(qc_sensitivity_gc_deleted, file.path(CFG$qc_dir, "qc_sensitivity_garbage_deleted.csv"))
   
   # ==========================================================
   # Roll-ups

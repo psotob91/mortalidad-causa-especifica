@@ -16,16 +16,34 @@ confirmed <- identical(Sys.getenv("CLEAN_CONFIRM", unset = ""), "YES")
 clean_specs <- list(
   list(kind = "dir_contents", path = here("data", "final"), note = "datasets finales regenerables"),
   list(kind = "dir_contents", path = here("data", "derived"), note = "datasets derivados y QC regenerables"),
-  list(kind = "dir_contents", path = here("data", "_catalog"), note = "catálogo/provenance regenerable"),
+  list(kind = "dir_contents", path = here("data", "_catalog"), note = "catalogo/provenance regenerable"),
   list(kind = "dir_contents", path = here("outputs"), note = "salidas auxiliares regenerables"),
   list(kind = "dir_contents", path = here("reports", "all_causes_word_report"), note = "reportes Word y figuras regenerables"),
-  list(kind = "dir_contents", path = here("reports", "all_causes_validation_report"), note = "reporte de validación regenerable"),
+  list(kind = "dir_contents", path = here("reports", "all_causes_validation_report"), note = "reporte de validacion regenerable"),
   list(kind = "dir_contents", path = here("reports", "qc_completeness_validation"), note = "figuras QC regenerables"),
   list(
     kind = "dir_filtered",
     path = here("reports", "all_causes_validation_excels"),
     note = "salidas Excel/DOCX regenerables; preserva scripts .R",
     keep_pattern = "\\.R$"
+  ),
+  list(
+    kind = "dir_filtered",
+    path = here("reports", "methodological_adjustment_report"),
+    note = "salidas del reporte metodologico; preserva plantillas .qmd/.R/.md",
+    keep_pattern = "\\.(R|qmd|md)$"
+  ),
+  list(
+    kind = "dir_filtered",
+    path = here("reports", "qc_pipeline_encyclopedia"),
+    note = "sitio QC regenerable; preserva solo templates fuente",
+    keep_pattern = "^(templates)$"
+  ),
+  list(
+    kind = "dir_regex",
+    path = here(),
+    note = "temporales locales del root",
+    pattern = "^tmp_.*|.*\\.tmp$"
   )
 )
 
@@ -37,7 +55,9 @@ recreate_dirs <- c(
   here("reports", "all_causes_word_report"),
   here("reports", "all_causes_validation_report"),
   here("reports", "qc_completeness_validation"),
-  here("reports", "all_causes_validation_excels")
+  here("reports", "all_causes_validation_excels"),
+  here("reports", "methodological_adjustment_report"),
+  here("reports", "qc_pipeline_encyclopedia")
 )
 
 collect_targets <- function(spec) {
@@ -48,6 +68,10 @@ collect_targets <- function(spec) {
   if (identical(spec$kind, "dir_filtered")) {
     keep_pattern <- spec$keep_pattern %||% "^$"
     return(kids[!grepl(keep_pattern, basename(kids), perl = TRUE)])
+  }
+  if (identical(spec$kind, "dir_regex")) {
+    pattern <- spec$pattern %||% "^$"
+    return(kids[grepl(pattern, basename(kids), perl = TRUE)])
   }
   character()
 }
@@ -82,7 +106,7 @@ if (nrow(target_rows) == 0L) {
 }
 
 if (dry_run || !confirmed) {
-  cat("\nNo se eliminó nada. Para ejecutar la limpieza real usar:\n")
+  cat("\nNo se elimino nada. Para ejecutar la limpieza real usar:\n")
   cat("  CLEAN_DRY_RUN=false CLEAN_CONFIRM=YES Rscript scripts/clean_regenerable_outputs.R\n")
   quit(save = "no", status = 0)
 }

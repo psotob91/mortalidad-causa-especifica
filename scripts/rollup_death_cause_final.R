@@ -39,12 +39,17 @@ source(here("R", "io_utils.R"))
 source(here("R", "catalog_utils.R"))
 source(here("R", "spec_utils.R"))
 
+final_input_override <- Sys.getenv("DCF_FINAL_INPUT_PATH", unset = "")
+output_suffix <- Sys.getenv("DCF_ROLLUP_OUTPUT_SUFFIX", unset = "")
+output_suffix_path <- if (nzchar(output_suffix)) paste0("_", output_suffix) else ""
+
 CFG <- list(
   version = "v0.3.0_leaf_only_hardened_total_safe_pandemic_reallocation",
   dataset_id = "death_cause_final_hierarchical",
   table_name = "death_cause_final_hierarchical",
   
   input_final_candidates = c(
+    if (nzchar(final_input_override)) final_input_override,
     here("data", "final", "death_cause_final", "death_cause_final.parquet"),
     here("data", "final", "death_cause_final", "death_cause_final.csv")
   ),
@@ -59,8 +64,8 @@ CFG <- list(
     here("data", "final", "cause_master", "cause_master.csv")
   ),
   
-  out_dir = here("data", "final", "death_cause_final_hierarchical"),
-  qc_dir  = qc_dir_path("rollup_death_cause_final"),
+  out_dir = here("data", "final", paste0("death_cause_final_hierarchical", output_suffix_path)),
+  qc_dir  = qc_dir_path(paste0("rollup_death_cause_final", output_suffix_path)),
   
   keep_only_levels = c(0L, 1L, 2L, 3L, 4L),
   
@@ -227,6 +232,10 @@ tryCatch({
     pandemic_excess_component = as.numeric(pandemic_excess_component),
     input_run_id = as.character(run_id)
   )]
+  dt[, pandemic_component_class := if ("pandemic_component_class" %in% names(dt_raw)) as.character(dt_raw$pandemic_component_class) else "non_pandemic"]
+  dt[, pandemic_named_component := if ("pandemic_named_component" %in% names(dt_raw)) as.numeric(dt_raw$pandemic_named_component) else 0]
+  dt[, oprm_residual_component := if ("oprm_residual_component" %in% names(dt_raw)) as.numeric(dt_raw$oprm_residual_component) else 0]
+  dt[, subregistro_gain_component := if ("subregistro_gain_component" %in% names(dt_raw)) as.numeric(dt_raw$subregistro_gain_component) else 0]
   
   if ("pandemic_reassigned_out_component" %in% names(dt_raw)) {
     dt[, pandemic_reassigned_out_component := as.numeric(dt_raw$pandemic_reassigned_out_component)]
@@ -302,6 +311,10 @@ tryCatch({
     deaths_final = sum(deaths_final, na.rm = TRUE),
     pandemic_reassigned_out_component = sum(pandemic_reassigned_out_component, na.rm = TRUE),
     pandemic_excess_component = sum(pandemic_excess_component, na.rm = TRUE),
+    pandemic_named_component = sum(pandemic_named_component, na.rm = TRUE),
+    oprm_residual_component = sum(oprm_residual_component, na.rm = TRUE),
+    subregistro_gain_component = sum(subregistro_gain_component, na.rm = TRUE),
+    pandemic_component_class = unique(pandemic_component_class)[1],
     cause_level = unique(cause_level)[1],
     cause_name = unique(cause_name)[1],
     parent_concept_id = unique(parent_concept_id)[1],
@@ -347,7 +360,10 @@ tryCatch({
       deaths_final,
       deaths_final_net_of_pandemic,
       pandemic_reassigned_out_component,
-      pandemic_excess_component
+      pandemic_excess_component,
+      pandemic_named_component,
+      oprm_residual_component,
+      subregistro_gain_component
     )],
     br_use,
     by = "terminal_cause_concept_id",
@@ -368,6 +384,9 @@ tryCatch({
     deaths_final_net_of_pandemic = sum(deaths_final_net_of_pandemic, na.rm = TRUE),
     pandemic_reassigned_out_component = sum(pandemic_reassigned_out_component, na.rm = TRUE),
     pandemic_excess_component = sum(pandemic_excess_component, na.rm = TRUE),
+    pandemic_named_component = sum(pandemic_named_component, na.rm = TRUE),
+    oprm_residual_component = sum(oprm_residual_component, na.rm = TRUE),
+    subregistro_gain_component = sum(subregistro_gain_component, na.rm = TRUE),
     cause_level_bridge = unique(cause_level_bridge)[1]
   ), by = .(year_id, location_id, sex_id, age, cause_concept_id)]
   
@@ -422,7 +441,10 @@ tryCatch({
     deaths_post_redistribution = safe_nonneg(deaths_post_redistribution),
     deaths_final = safe_nonneg(deaths_final),
     deaths_final_net_of_pandemic = safe_nonneg(deaths_final_net_of_pandemic),
-    pandemic_excess_component = safe_nonneg(pandemic_excess_component)
+    pandemic_excess_component = safe_nonneg(pandemic_excess_component),
+    pandemic_named_component = safe_nonneg(pandemic_named_component),
+    oprm_residual_component = safe_nonneg(oprm_residual_component),
+    subregistro_gain_component = safe_nonneg(subregistro_gain_component)
   )]
   
   out_final[, run_id := run_id]
@@ -434,7 +456,8 @@ tryCatch({
     "cause_level", "cause_name", "parent_concept_id", "is_terminal",
     "deaths_observed", "deaths_post_redistribution", "deaths_final",
     "base_cause_deaths_corrected", "correction_factor_completeness",
-    "pandemic_reassigned_out_component", "pandemic_excess_component",
+    "subregistro_gain_component", "pandemic_reassigned_out_component",
+    "pandemic_named_component", "oprm_residual_component", "pandemic_excess_component",
     "deaths_final_net_of_pandemic", "run_id"
   ))
   

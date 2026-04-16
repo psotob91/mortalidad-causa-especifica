@@ -7,36 +7,27 @@
 # ============================================================
 
 # ============================================================
-# 1. DATOS DERIVADOS Y OUTPUTS (EXCLUIR)
+# 1. DATOS DERIVADOS Y OUTPUTS
 # ============================================================
 /data/final/
 /data/derived/
-/outputs/
 /data/_catalog/
+/outputs/
 
 # ============================================================
-# 2. DATA RAW: EXCLUIR POR DEFECTO Y REABRIR SOLO LO PÚBLICO
+# 2. DATA RAW: excluir por defecto y reabrir solo lo público
 # ============================================================
 /data/raw/**
-
-# --- Mantener solo raw públicos necesarios para reproducibilidad ---
 !/data/raw/
 !/data/raw/cause_mapping/
 !/data/raw/cause_mapping/**
 !/data/raw/redistribution_rules/
 !/data/raw/redistribution_rules/**
-
-# --- Mantener otras carpetas raw públicas SOLO si existen y NO son sensibles ---
-# !/data/raw/<carpeta_publica>/
-# !/data/raw/<carpeta_publica>/**
-
-# --- Proteger explícitamente SINADEF confidencial ---
 /data/raw/sinadef/
 /data/raw/sinadef/**
 
 # ============================================================
-# 3. ARCHIVOS TABULARES Y SERIALIZADOS (EXCLUIR GLOBALMENTE)
-#    Luego se reabren solo las excepciones seguras/versionables.
+# 3. ARCHIVOS TABULARES Y SERIALIZADOS
 # ============================================================
 *.csv
 *.tsv
@@ -53,14 +44,14 @@
 *.db
 
 # ============================================================
-# 4. JSON / GEOJSON / OTROS POTENCIALMENTE SENSIBLES
+# 4. JSON / GEOJSON / OTROS DERIVADOS
 # ============================================================
 *.json
 *.geojson
 *.ndjson
 
 # ============================================================
-# 5. DOCUMENTOS Y REPORTES RENDERIZADOS
+# 5. REPORTES RENDERIZADOS Y ARTEFACTOS DE QUARTO
 # ============================================================
 *.pdf
 *.docx
@@ -108,7 +99,7 @@ __pycache__/
 Thumbs.db
 
 # ============================================================
-# 9. EXCEPCIONES IMPORTANTES: CÓDIGO Y DOCUMENTACIÓN
+# 9. EXCEPCIONES IMPORTANTES: CÓDIGO Y DOCUMENTACIÓN FUENTE
 # ============================================================
 !*.R
 !*.qmd
@@ -128,7 +119,7 @@ Thumbs.db
 !LICENSE
 
 # ============================================================
-# 10. EXCEPCIONES IMPORTANTES: CONFIGURACIÓN DEL PROYECTO
+# 10. CONFIGURACIÓN DEL PROYECTO
 # ============================================================
 !/config/
 !/config/*.yml
@@ -138,7 +129,7 @@ Thumbs.db
 !/config/*.txt
 
 # ============================================================
-# 11. EXCEPCIONES IMPORTANTES: RAW PÚBLICOS ESPECÍFICOS
+# 11. RAW PÚBLICOS ESPECÍFICOS VERSIONABLES
 # ============================================================
 !/data/raw/cause_mapping/*.xlsx
 !/data/raw/cause_mapping/*.xls
@@ -148,7 +139,7 @@ Thumbs.db
 !/data/raw/redistribution_rules/*.csv
 
 # ============================================================
-# 12. EXCEPCIONES IMPORTANTES: INFRAESTRUCTURA REPRODUCIBLE
+# 12. INFRAESTRUCTURA REPRODUCIBLE
 # ============================================================
 !/renv.lock
 !/.Rprofile
@@ -159,7 +150,7 @@ Thumbs.db
 !/renv/settings.json
 
 # ============================================================
-# 13. EXCEPCIONES IMPORTANTES: ARCHIVOS ESTRUCTURALES DEL PROYECTO
+# 13. ARCHIVOS ESTRUCTURALES DEL PROYECTO
 # ============================================================
 !tree_project.txt
 !Estructura-del-proyecto-actualizada.txt
@@ -170,7 +161,7 @@ Thumbs.db
 !docs/quickstart_first_use.pdf
 
 # ============================================================
-# 14. EXCEPCIONES EXPLÍCITAS PARA MAESTROS/DICCIONARIOS VERSIONABLES
+# 14. MAESTROS / DICCIONARIOS VERSIONABLES
 # ============================================================
 !config/maestro_age_simple.csv
 !config/maestro_external_inputs.csv
@@ -179,7 +170,35 @@ Thumbs.db
 !data/raw/redistribution_rules/patch_targets_redistribucion_excluir_yll.csv
 
 # ============================================================
-# 15. RECORDATORIO
+# 15. REPORTES GENERADOS Y PORTAL QC
+#    Mantener solo plantillas y fuentes estructurales.
+# ============================================================
+/reports/all_causes_validation_excels/
+/reports/all_causes_validation_report/
+/reports/all_causes_word_report/
+/reports/final_word_report/
+/reports/qc_completeness_validation/
+/reports/qc_pipeline_encyclopedia/index.html
+/reports/qc_pipeline_encyclopedia/publish_guide.html
+/reports/qc_pipeline_encyclopedia/modules/
+/reports/qc_pipeline_encyclopedia/pdf/
+/reports/methodological_adjustment_report/pdf/
+/reports/methodological_adjustment_report/tables/
+/reports/methodological_adjustment_report/methodological_adjustment_report.pdf
+
+!/reports/
+!/reports/qc_pipeline_encyclopedia/
+!/reports/qc_pipeline_encyclopedia/assets/
+!/reports/qc_pipeline_encyclopedia/assets/**
+!/reports/qc_pipeline_encyclopedia/templates/
+!/reports/qc_pipeline_encyclopedia/templates/**
+!/reports/methodological_adjustment_report/
+!/reports/methodological_adjustment_report/*.qmd
+!/reports/methodological_adjustment_report/*.md
+!/reports/methodological_adjustment_report/*.R
+
+# ============================================================
+# 16. RECORDATORIO
 # ============================================================
 # Antes de hacer git add ., confirma con:
 #   git status --ignored
@@ -188,5 +207,6 @@ Thumbs.db
 # - data/final/
 # - data/derived/
 # - outputs/
+# - reportes renderizados
 # - cualquier csv/parquet derivado sensible
 # ============================================================

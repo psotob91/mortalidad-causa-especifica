@@ -1,0 +1,182 @@
+glossary:
+  masa: "En este proyecto, masa significa el total de muertes o del indicador que debe conservarse antes y despues de una transformacion analitica. Si la masa cambia sin justificacion, puede haber perdida o duplicacion de informacion."
+  reconciliacion: "Proceso por el cual se fuerza consistencia entre niveles jerarquicos o geografias, de modo que un total padre coincida con la suma de sus partes."
+  causa_terminal: "Causa terminal o nodo hoja es una causa que no tiene hijas. Es el nivel donde se permite redistribuir y desde el cual se reconstruyen niveles superiores."
+  hard_fail: "Hallazgo que invalida la consistencia minima esperada del paso. Un hard fail no debe tratarse como advertencia menor."
+  baseline: "Comparacion del rerun actual contra una corrida de referencia previamente validada. Sirve para detectar cambios no deseados."
+  fallback: "Ruta alternativa de lectura o procesamiento que usa el mismo dataset canonico en otro formato, por ejemplo pasar de parquet a csv."
+  completitud: "Ajuste o evaluacion del grado en que las defunciones observadas representan el total esperado de muertes."
+  plausibilidad: "Juicio sobre si un resultado es razonable desde el punto de vista epidemiologico y operativo, aunque no implique por si mismo un error estructural."
+  suavizamiento: "Modelamiento de tasas para reducir ruido extremo en celdas pequenas sin cambiar la estructura sustantiva del resultado."
+  aditividad: "Propiedad por la cual una categoria agregada coincide con la suma de sus partes cuando corresponde."
+  pandemia: "Componente de mortalidad asociado al periodo pandemico y su manejo contable dentro del pipeline."
+  veredicto: "Conclusion sintetica del QC. Puede indicar correcto, observacion o problema material."
+
+special_sections:
+  run_pipeline:
+    section_title: "00. Orquestacion y trazabilidad de la corrida"
+    purpose: "Resume si el runner ejecuto los pasos esperados, en que orden y con que estado final."
+    step_order: 0
+    script_path: "scripts/run_pipeline.R"
+  baseline_compare:
+    section_title: "99. Comparacion contra baseline validado"
+    purpose: "Verifica que el rerun final no introduzca diferencias sustantivas frente a la referencia aprobada."
+    step_order: 999
+    script_path: "scripts/compare_validation_baseline.R"
+
+folder_overrides:
+  ingest_sinadef_raw:
+    section_title: "01. Ingesta cruda de SINADEF"
+    purpose: "Verifica que los archivos fuente se descubran, se lean correctamente y preserven la informacion minima requerida."
+  normalize_death_record:
+    section_title: "02. Normalizacion del registro de defuncion"
+    purpose: "Evalua si las variables basicas del registro quedaron armonizadas y listas para mapeo causal."
+  cause_master:
+    section_title: "03. Maestro de causas"
+    purpose: "Revisa la coherencia semantica y pandemica del catalogo maestro de causas del proyecto."
+  cause_hierarchy_bridge:
+    section_title: "04. Puente jerarquico de causas"
+    purpose: "Controla que la jerarquia de ancestros y descendientes sea consistente y libre de ciclos."
+  redistribution_rules:
+    section_title: "05. Reglas de redistribucion"
+    purpose: "Controla que las reglas de redistribucion respeten restricciones de sexo, edad y terminalidad."
+  map_and_redistribute_deaths:
+    section_title: "06. Mapeo y redistribucion de muertes"
+    purpose: "Evalua el mapeo CIE-10, las incompatibilidades demograficas y el comportamiento de la redistribucion."
+  qc_redistribution:
+    section_title: "07. QC especifico de redistribucion"
+    purpose: "Resume si la redistribucion conserva masa y si la reasignacion observada es trazable."
+  build_death_cause_final:
+    section_title: "08. Mortalidad final con completitud y pandemia"
+    purpose: "Evalua el ajuste por completitud, el manejo pandemico y la consistencia de la mortalidad final."
+  rollup_death_cause_final:
+    section_title: "09. Roll-up jerarquico final"
+    purpose: "Verifica que la expansion desde causas terminales a niveles agregados sea consistente."
+  qc_completeness_validation:
+    section_title: "10. Validacion de completitud"
+    purpose: "Presenta controles de plausibilidad y consistencia del ajuste por completitud."
+  build_mortality_rates:
+    section_title: "11. Tasas de mortalidad y suavizamiento"
+    purpose: "Controla suficiencia de datos, suavizamiento, preservacion de masa y plausibilidad de tasas."
+  reconcile_mortality_hierarchy:
+    section_title: "12. Reconciliacion jerarquica y geografica"
+    purpose: "Verifica aditividad exacta entre niveles causales y geografias despues de la reconciliacion."
+  compute_avp_yll:
+    section_title: "13. Calculo de AVP y YLL"
+    purpose: "Evalua elegibilidad, consistencia, no negatividad y plausibilidad del calculo de AVP/YLL."
+  build_report_tables:
+    section_title: "14. Tablas maestras reportables"
+    purpose: "Controla aditividad, recalculo de tasas y consistencia final de las tablas de reporte."
+  build_methods_catalogs:
+    section_title: "15. Catalogos metodologicos"
+    purpose: "Resume cobertura observada, trazabilidad del mapeo y restricciones metodologicas del proyecto."
+  build_oms_reference_compare_partial:
+    section_title: "16. Comparacion OMS vs proyecto"
+    purpose: "Documenta diferencias y convergencias entre referencias OMS y la implementacion del proyecto."
+
+file_overrides:
+  pipeline_run_log.csv:
+    title: "Log de ejecucion del pipeline"
+    automation_rule: "runner_success"
+    what_is: "Es el registro cronologico del runner del pipeline."
+    what_does: "Muestra cada paso ejecutado, su script, su estado final, codigos de salida y tiempo transcurrido."
+    purpose: "Sirve para confirmar que la corrida realmente recorrio todos los pasos esperados y que no hubo fallos bloqueantes."
+    interpretation: "Lo esperado es que todos los pasos queden en success con exit_code igual a 0."
+    possible_results: "Si todos los pasos terminan bien, la corrida queda aprobada en su capa operativa. Si algun paso falla, la corrida no debe considerarse valida."
+  qc_baseline_vs_rerun_summary.csv:
+    title: "Resumen de comparacion contra baseline"
+    automation_rule: "baseline_summary"
+    what_is: "Es la comparacion sintetica entre el rerun actual y la baseline previamente validada."
+    what_does: "Resume diferencias absolutas y de tasas para mortalidad y AVP."
+    purpose: "Sirve para detectar cambios no deseados despues de un rerun o un ajuste del pipeline."
+    interpretation: "Lo esperado es ausencia de diferencias sustantivas, o solo diferencias de precision numerica despreciables."
+    possible_results: "Sin diferencias sustantivas implica pase. Diferencias materiales implican hallazgo bloqueante."
+  qc_rate_recalculation.csv:
+    title: "Recalculo de tasas reportables"
+    automation_rule: "n_bad_zero"
+    what_is: "Recalcula tasas desde numerador y poblacion para compararlas con las tasas exportadas."
+    what_does: "Detecta errores de redondeo excesivo o inconsistencia entre tablas maestras."
+    purpose: "Sirve para confirmar que las tablas finales respetan la definicion de tasa del proyecto."
+    interpretation: "Lo esperado es n_bad igual a 0."
+    possible_results: "Cero desvíos materiales implica pase. Desvios no nulos implican problema de tabla final."
+  qc_cause_additivity.csv:
+    title: "Aditividad por causa"
+    automation_rule: "n_bad_zero"
+    what_is: "Compara si las causas agregadas equivalen a la suma de sus componentes donde corresponde."
+    what_does: "Busca rupturas de consistencia en la composicion causal de las tablas reportables."
+    purpose: "Sirve para comprobar que la jerarquia final sigue cerrando en la salida de reporte."
+    interpretation: "Lo esperado es n_bad igual a 0."
+    possible_results: "Sin fallos implica consistencia causal. Fallos no nulos indican ruptura de aditividad."
+
+pattern_overrides:
+  - regex: "mismatch_positive"
+    automation_rule: "empty_is_good"
+    what_is: "Es un QC de incompatibilidad demografica positiva."
+    what_does: "Busca registros donde una causa incompatible con cierto sexo o edad sigue apareciendo con valor positivo."
+    purpose: "Sirve para confirmar que las restricciones demograficas quedaron bien aplicadas."
+    interpretation: "Lo esperado es una tabla vacia."
+    possible_results: "Tabla vacia implica pase. Filas presentes implican incompatibilidades remanentes."
+  - regex: "duplicate|duplicates"
+    automation_rule: "empty_is_good"
+    what_is: "Es un QC de duplicados."
+    what_does: "Busca llaves o combinaciones repetidas que no deberian existir."
+    purpose: "Sirve para prevenir doble conteo o colisiones de identificadores."
+    interpretation: "Lo esperado es una tabla vacia, salvo que el propio nombre del archivo indique un resumen."
+    possible_results: "Tabla vacia implica pase. Filas presentes indican potencial duplicacion."
+  - regex: "cycles|bad_|_bad\\.csv|failures|nonterminal_targets|out_of_time_window|unresolved_|top_unmapped_non_garbage|ineligible_positive"
+    automation_rule: "empty_is_good"
+    what_is: "Es un QC detectivo orientado a capturar registros problematicos."
+    what_does: "Enumera solamente las filas que violan una regla fuerte del pipeline."
+    purpose: "Sirve para concentrar la revision en problemas concretos."
+    interpretation: "Lo esperado es una tabla vacia."
+    possible_results: "Tabla vacia implica pase. Filas presentes implican hallazgo que debe revisarse."
+  - regex: "hard_compare"
+    automation_rule: "pass_columns_true"
+    what_is: "Es un QC de comparacion exacta entre una vista agregada y la suma de sus componentes."
+    what_does: "Marca explicitamente si cada celda pasa o no pasa una comparacion dura."
+    purpose: "Sirve para demostrar reconciliacion exacta."
+    interpretation: "Lo esperado es que todas las columnas de pase queden en TRUE."
+    possible_results: "Todo TRUE implica reconciliacion correcta. Cualquier FALSE implica falla material."
+  - regex: "additivity|rate_recalculation"
+    automation_rule: "n_bad_zero"
+    what_is: "Es un QC de consistencia final de tablas."
+    what_does: "Resume cuantos registros no cumplieron la regla esperada."
+    purpose: "Sirve para cerrar rapidamente la validacion tabular."
+    interpretation: "Lo esperado es n_bad igual a 0."
+    possible_results: "Cero implica pase. Valores positivos indican inconsistencia."
+  - regex: "balance|preservation|baseline_vs_rerun_nat_year_sex_totals"
+    automation_rule: "diff_zero"
+    what_is: "Es un QC de balance o preservacion."
+    what_does: "Compara totales antes y despues de una transformacion."
+    purpose: "Sirve para verificar que no se pierda ni se cree masa analitica sin justificacion."
+    interpretation: "Lo esperado es diferencia cero o solo error numerico despreciable."
+    possible_results: "Diferencia nula implica pase. Diferencias visibles implican problema material."
+  - regex: "summary|audit|registry|attempt_log|method_summary|by_level|year_summary|year_totals|semantic_note|top_"
+    automation_rule: "assisted"
+    what_is: "Es una tabla de resumen, auditoria o apoyo interpretativo."
+    what_does: "Describe el comportamiento observado del paso, pero no siempre se cierra con una sola regla automatica."
+    purpose: "Sirve para contextualizar el veredicto del paso y apoyar lectura experta."
+    interpretation: "Debe leerse junto con los QCs duros del mismo paso."
+    possible_results: "Puede cerrar como correcto, observacion o hallazgo segun su contenido."
+
+render_defaults:
+  pdf_small_rows: 18
+  pdf_small_cols: 8
+  pdf_small_bytes: 150000
+  html_inline_rows: 120
+  html_inline_cols: 12
+  html_inline_bytes: 1000000
+  html_split_bytes: 2000000
+  html_split_qc_count: 15
+  html_split_download_only_count: 3
+  html_split_preview_count: 6
+  extreme_rows: 5000
+  extreme_cols: 25
+  extreme_bytes: 5000000
+  sample_n_rows: 20
+  pdf_preview_rows: 10
+  html_preview_rows: 40
+  sample_char_rows: 80
+  max_full_rows_html: 1000
+  max_figures_per_step_pdf: 3
+  max_estimated_pages_per_tome: 90

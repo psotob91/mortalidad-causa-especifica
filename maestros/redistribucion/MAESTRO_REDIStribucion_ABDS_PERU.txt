@@ -1,0 +1,336 @@
+MAESTRO_REDIStribucion_ABDS_PERU
+Version 2.0
+Uso: guia operativa para producir analisis, tablas, figuras y redaccion tecnica de la seccion peruana de redistribucion de muertes con estilo analitico cercano al ABDS 2018.
+
+I. PROPOSITO
+
+Este maestro define como estudiar y reportar la redistribucion de muertes en el analisis peruano de carga de enfermedad.
+Su objetivo es capturar la logica del ABDS 2018 para describir el problema, justificar el metodo, cuantificar el impacto y mostrar trazabilidad.
+Este maestro no reemplaza la metodologia sustantiva del proyecto.
+Este maestro ordena como debe explicarse esa metodologia.
+
+II. PRINCIPIOS EDITORIALES
+
+1. La redistribucion debe presentarse como un problema de validez de la causa basica.
+2. La redistribucion debe mostrar primero el problema y despues la solucion analitica.
+3. Cada grupo de redistribucion debe tener nombre, alcance y logica epidemiologica propios.
+4. Cada metodo debe tener criterio de eleccion explicito.
+5. Cada resultado debe poder rastrearse desde el insumo hasta la salida final.
+6. La magnitud del proceso debe reportarse en muertes y en AVP.
+7. La narracion debe separar siempre:
+   - metodologia fuente
+   - adaptacion analitica peruana
+   - modelamiento adicional
+8. Los resultados no deben limitarse a tablas globales.
+9. Las tablas deben responder preguntas metodologicas concretas.
+10. La transparencia tiene prioridad sobre la brevedad.
+
+III. QUE DEBE IMITARSE DEL ABDS
+
+1. Definir con claridad por que ciertos codigos no son validos para analisis de carga.
+2. Clasificar los codigos a redistribuir en grupos con una logica comun.
+3. Presentar para cada grupo:
+   - codigos incluidos
+   - metodo aplicado
+   - alcance de las causas destino
+   - numero de muertes
+   - proporcion del total redistribuido
+4. Explicar la jerarquia entre metodos.
+5. Mostrar que la eleccion del metodo depende del nivel de evidencia disponible.
+6. Reportar cambios metodologicos respecto de versiones previas o decisiones anteriores.
+7. Cuantificar el impacto antes y despues de la redistribucion.
+8. Cuantificar el impacto en numero de muertes y en AVP.
+9. Mostrar el efecto por gran grupo de enfermedad.
+10. Incluir al menos una caja explicativa que muestre un caso concreto de trazabilidad.
+11. Conectar las tablas metodologicas con las tablas de resultados.
+12. Mantener una transicion clara entre metodos y resultados.
+
+IV. QUE NO DEBE IMITARSE DE FORMA MECANICA
+
+1. No copiar grupos australianos si no corresponden al patron peruano.
+2. No copiar universos de causas destino si no son defendibles en Peru.
+3. No copiar porcentajes del ABDS.
+4. No copiar una tabla solo porque existe en el ABDS.
+5. No llamar evidencia directa a una regla local sin fuente directa real.
+6. No asumir que la estructura institucional australiana existe en el contexto peruano.
+7. No mezclar la logica del ABDS con una adaptacion peruana en una misma oracion.
+
+V. REGLAS PARA REPORTAR METODOS
+
+Cada subseccion metodologica debe responder en este orden:
+
+1. Que codigos entran a redistribucion.
+2. Por que esos codigos no son aceptables como causa basica final.
+3. Como se agrupan.
+4. Que metodo se aplica a cada grupo.
+5. Por que ese metodo fue elegido.
+6. Cual es el universo de causas destino.
+7. Si la redistribucion es total o parcial.
+8. Como se construyen los pesos o reglas de reasignacion.
+9. Que supuestos introduce la reasignacion.
+10. Como se evaluara el impacto de la redistribucion.
+
+VI. JERARQUIA DE METODOS
+
+Orden de preferencia:
+
+1. Evidencia directa
+   Definicion: informacion empirica especifica que permite inferir una causa mas plausible.
+   Uso: cuando existe una fuente con alta especificidad para el grupo redistribuido.
+
+2. MCOD indirecto
+   Definicion: distribucion de causas basicas observada cuando el codigo a redistribuir aparece como causa asociada.
+   Uso: cuando existe frecuencia suficiente y buena calidad de multiples causas.
+
+3. Redistribucion proporcional
+   Definicion: reasignacion segun la distribucion observada de causas validas dentro del universo destino.
+   Uso: solo cuando los metodos mas especificos no son viables.
+
+Regla obligatoria:
+Si se usa un metodo menos especifico pese a existir otro mas especifico viable, la justificacion debe quedar escrita.
+
+VII. REGLAS PARA REPORTAR RESULTADOS
+
+1. El primer resultado debe cuantificar el tamano total del problema.
+2. El segundo resultado debe mostrar la composicion del problema por grupos de redistribucion.
+3. El tercer resultado debe mostrar cuanto aporta cada metodo.
+4. El cuarto resultado debe mostrar el cambio antes y despues por gran grupo de enfermedad.
+5. El quinto resultado debe mostrar el impacto en AVP.
+6. Debe existir al menos una demostracion trazable de como una causa gana muertes tras la redistribucion.
+7. Debe quedar claro que parte del resultado final depende de la redistribucion proporcional.
+8. Si hubo cambios metodologicos, su impacto debe mostrarse en resultados y no solo en texto.
+
+VIII. CATALOGO DE TABLAS OBLIGATORIAS
+
+Tabla 1. Catalogo de grupos de redistribucion
+Pregunta: que grupos existen y como se redistribuyen.
+Columnas minimas:
+- nombre del grupo
+- codigos CIE-10 incluidos
+- metodo
+- alcance de causas destino
+- numero de muertes
+- porcentaje del total redistribuido
+
+Tabla 2. Fuente de evidencia y razon del metodo elegido
+Pregunta: por que cada grupo usa ese metodo.
+Columnas minimas:
+- grupo de redistribucion
+- tipo de evidencia
+- fuente
+- metodo elegido
+- razon de eleccion
+- observaciones
+
+Tabla 3. Muertes y AVP afectados por redistribucion
+Pregunta: cual es la magnitud total del proceso.
+Columnas minimas:
+- ano
+- muertes totales
+- muertes redistribuidas
+- porcentaje de muertes redistribuidas
+- AVP totales
+- AVP redistribuidos
+- porcentaje de AVP redistribuidos
+
+Tabla 4. Impacto antes y despues por gran grupo de enfermedad
+Pregunta: que grupos ganan o pierden mas por la redistribucion.
+Columnas minimas:
+- grupo de enfermedad
+- muertes antes
+- muertes despues
+- cambio absoluto en muertes
+- cambio porcentual en muertes
+- AVP antes
+- AVP despues
+- cambio absoluto en AVP
+- cambio porcentual en AVP
+
+Tabla 5. Principales grupos o codigos redistribuidos por volumen
+Pregunta: donde se concentra el problema.
+Columnas minimas:
+- grupo o codigo
+- muertes redistribuidas
+- porcentaje del total redistribuido
+- metodo
+- principal destino o destinos
+
+Tabla 6. Principales causas destino de la redistribucion
+Pregunta: quienes son los principales ganadores de muertes y AVP.
+Columnas minimas:
+- causa destino
+- muertes ganadas
+- AVP ganados
+- porcentaje del total ganado
+- metodo predominante
+
+Tabla 7. Distribucion por edad y sexo
+Pregunta: en que edades y sexos se concentra la redistribucion.
+Columnas minimas:
+- grupo de edad
+- sexo
+- muertes redistribuidas
+- AVP redistribuidos
+- porcentaje dentro del total redistribuido
+
+Tabla 8. Cambios metodologicos respecto de una version previa o decision anterior
+Pregunta: que cambio y por que importa.
+Columnas minimas:
+- componente cambiado
+- criterio previo
+- criterio actual
+- fuente o justificacion
+- salida afectada
+- efecto esperado
+
+Tabla 9. Caja numerica de trazabilidad para una causa ejemplar
+Pregunta: de donde viene la ganancia final de una causa destino.
+Columnas minimas:
+- causa destino
+- muertes antes
+- grupo fuente
+- metodo
+- aporte de muertes
+- porcentaje del aumento total
+- muertes despues
+
+IX. CATALOGO DE GRAFICOS RECOMENDADOS
+
+1. Barras apiladas del total redistribuido por metodo.
+2. Barras horizontales de los grupos de redistribucion con mayor volumen.
+3. Barras antes y despues para los principales grupos de enfermedad.
+4. Dot plot del cambio porcentual por grupo de enfermedad.
+5. Heatmap de muertes redistribuidas por edad y sexo.
+6. Serie temporal del porcentaje de muertes redistribuidas.
+7. Serie temporal del porcentaje de AVP redistribuidos.
+8. Grafico aluvial o sankey simplificado desde grupos de redistribucion a grandes causas destino.
+9. Grafico de concentracion acumulada de muertes redistribuidas por grupo.
+10. Mapa regional del porcentaje redistribuido solo si el analisis subnacional es metodologicamente defendible.
+
+X. CATALOGO DE ANALISIS ADICIONALES RECOMENDADOS
+
+1. Contribucion de cada metodo al total redistribuido.
+Pregunta: cuanto del proceso depende de metodos mas especificos y cuanto depende del metodo proporcional.
+
+2. Distribucion de pesos por grupo destino.
+Pregunta: que tan concentrada o difusa es la reasignacion.
+
+3. Porcentaje de AVP afectados por redistribucion.
+Pregunta: si el efecto es mayor sobre volumen o sobre perdida prematura de vida.
+
+4. Estabilidad temporal de los pesos.
+Pregunta: si los patrones de redistribucion son consistentes entre anos.
+
+5. Comparacion antes y despues por grupo de causa.
+Pregunta: que grupos cambian mas en magnitud y en jerarquia.
+
+6. Principales garbage codes por volumen e impacto.
+Pregunta: que fracciones del problema explican mas de la redistribucion.
+
+7. Concentracion de redistribucion por edad y sexo.
+Pregunta: si la redistribucion se concentra en perfiles demograficos especificos.
+
+8. Mapas o heatmaps por region.
+Pregunta: si existen diferencias territoriales en la dependencia de redistribucion.
+
+9. Sensibilidad al cambiar el algoritmo o el universo de causas destino.
+Pregunta: cuanto cambia el resultado final bajo decisiones plausibles alternativas.
+
+10. Fraccion de ganancia atribuible a cada grupo de redistribucion para una causa prioritaria.
+Pregunta: de donde procede la ganancia de una causa que aumenta despues de la redistribucion.
+
+XI. REGLAS DE ESTILO PARA TITULOS, NOTAS E INTERPRETACION
+
+1. Cada titulo debe decir que se compara o que se cuantifica.
+2. Cada nota al pie debe aclarar el denominador y el alcance.
+3. Cada nota debe aclarar exclusiones o restricciones de destino cuando existan.
+4. Si una tabla usa solo causas o grupos principales, debe declararlo.
+5. La interpretacion debe responder una pregunta metodologica.
+6. La interpretacion no debe limitarse a repetir numeros.
+7. La interpretacion debe cubrir:
+   - magnitud
+   - direccion del cambio
+   - metodo que explica el cambio
+   - implicancia para AVP
+   - implicancia para comparabilidad
+
+XII. REGLAS DE TRAZABILIDAD ENTRE INSUMO, METODO Y SALIDA
+
+1. Todo grupo debe poder vincularse con sus codigos fuente.
+2. Todo grupo debe poder vincularse con su metodo.
+3. Todo metodo debe poder vincularse con su universo de causas destino.
+4. Todo resultado debe poder vincularse con la cantidad de muertes reasignadas.
+5. Todo cambio en AVP debe poder vincularse con un cambio en muertes redistribuidas.
+6. Toda caja explicativa debe mostrar el camino completo desde la fuente hasta la causa destino.
+
+XIII. REGLAS PARA EXPLICAR CAMBIOS METODOLOGICOS Y SENSIBILIDAD
+
+Si hubo cambios respecto del protocolo, de una version previa o de una regla internacional, debe reportarse siempre:
+
+1. que cambio
+2. por que cambio
+3. que fuente o evidencia lo sustenta
+4. que parte del resultado puede verse afectada
+5. si el cambio mejora validez, especificidad, consistencia o coherencia
+
+Si se presenta sensibilidad, debe indicarse:
+
+1. que componente se modifico
+2. que escenarios se compararon
+3. que salida se evaluo
+4. si la conclusion principal cambia o no cambia
+
+XIV. REGLAS PARA DOCUMENTAR LIMITACIONES
+
+1. Dependencia de la calidad del certificado de defuncion.
+2. Dependencia de la calidad del patron de multiples causas.
+3. Posibles sesgos del metodo proporcional.
+4. Limitaciones de las fuentes directas.
+5. Incertidumbre de los pesos de redistribucion.
+6. Posible heterogeneidad regional.
+7. Diferencia entre validez clinica y validez estadistica de la reasignacion.
+
+XV. REGLAS PARA DISTINGUIR CAPAS
+
+Metodologia fuente
+Se usa para describir la logica del ABDS y otras fuentes de referencia.
+
+Adaptacion analitica peruana
+Se usa para describir como esa logica se traduce al estudio del Peru.
+
+Modelamiento adicional
+Se usa solo cuando existe una regla propia que no proviene directamente de la metodologia fuente.
+
+Regla absoluta
+Nunca mezclar dos capas en una misma oracion.
+
+XVI. ARTEFACTOS QUE CODEX DEBE INTENTAR CONSTRUIR DESPUES
+
+1. Diccionario maestro de grupos de redistribucion.
+2. Tabla maestra de codigos a redistribuir.
+3. Tabla de metodos y evidencia por grupo.
+4. Tabla de pesos o reglas de reasignacion.
+5. Tabla de impacto antes y despues.
+6. Tabla de AVP afectados.
+7. Caja explicativa de trazabilidad.
+8. Graficos de impacto global y por causa.
+9. Analisis de sensibilidad.
+10. Resumen ejecutivo metodologico de redistribucion.
+
+XVII. PROHIBICIONES
+
+1. No usar visualizaciones decorativas.
+2. No ocultar el peso de la redistribucion proporcional.
+3. No presentar resultados sin notas metodologicas minimas.
+4. No mezclar muertes y AVP sin identificar la unidad.
+5. No presentar una sola tabla global si no permite entender el mecanismo.
+6. No usar lenguaje informatico en el anexo metodologico final.
+7. No confundir una inspiracion del ABDS con una regla ya validada para Peru.
+
+XVIII. CRITERIO FINAL
+
+Un buen reporte de redistribucion no solo muestra a donde fueron las muertes.
+Tambien debe mostrar por que se redistribuyeron.
+Tambien debe mostrar con que evidencia se redistribuyeron.
+Tambien debe mostrar cuanto cambiaron las muertes y los AVP.
+Tambien debe mostrar que parte del resultado final depende de esa decision metodologica.

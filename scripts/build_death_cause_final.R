@@ -36,7 +36,12 @@ suppressPackageStartupMessages({
 
 source(here("R", "io_utils.R"))
 source(here("R", "catalog_utils.R"))
+source(here("R", "pandemic_utils.R"))
 source(here("R", "spec_utils.R"))
+
+leaf_input_override <- Sys.getenv("DCF_LEAF_INPUT_PATH", unset = "")
+output_suffix <- Sys.getenv("DCF_OUTPUT_SUFFIX", unset = "")
+output_suffix_path <- if (nzchar(output_suffix)) paste0("_", output_suffix) else ""
 
 CFG <- list(
   version = "v0.4.1_pandemic_2020_2022_and_window_qc",
@@ -60,10 +65,11 @@ CFG <- list(
   
   verbose = TRUE,
   
-  out_dir = here("data", "final", "death_cause_final"),
-  qc_dir  = qc_dir_path("build_death_cause_final"),
+  out_dir = here("data", "final", paste0("death_cause_final", output_suffix_path)),
+  qc_dir  = qc_dir_path(paste0("build_death_cause_final", output_suffix_path)),
   
   leaf_candidates = c(
+    if (nzchar(leaf_input_override)) leaf_input_override,
     here("data", "final", "death_cause_leaf_post_redistribution", "death_cause_leaf_post_redistribution.parquet"),
     here("data", "final", "death_cause_leaf_post_redistribution", "death_cause_leaf_post_redistribution.csv")
   ),
@@ -170,8 +176,9 @@ fill_factor_hierarchical <- function(fac_base) {
     is.na(population), "missing_population",
     fifelse(is.na(mx), "missing_mx",
             fifelse(is.na(expected_allcause), "missing_expected",
-                    fifelse(population <= 0, "invalid_population_nonpositive",
-                            "ok")))
+                    fifelse(population <= 0 & expected_allcause <= 0, "structural_zero_population",
+                            fifelse(population <= 0, "invalid_population_nonpositive",
+                                    "ok"))))
   )]
   
   x[, direct_ratio_raw := safe_ratio(expected_allcause, observed_allcause)]
@@ -223,7 +230,7 @@ fill_factor_hierarchical <- function(fac_base) {
     CFG$min_completeness_factor,
     CFG$max_completeness_factor
   )]
-  x[, factor_from_missing_external := external_status != "ok"]
+  x[, factor_from_missing_external := !external_status %in% c("ok", "structural_zero_population")]
   
   x[]
 }
@@ -373,6 +380,8 @@ tryCatch({
     cause_name = as.character(cause_name),
     is_terminal = as.logical(is_terminal),
     is_covid_related = as.logical(is_covid_related),
+    is_covid_specific = if ("is_covid_specific" %in% names(cm)) as.logical(is_covid_specific) else FALSE,
+    is_oprm = if ("is_oprm" %in% names(cm)) as.logical(is_oprm) else FALSE,
     target_age_start_default = if ("target_age_start_default" %in% names(cm)) {
       as.integer(target_age_start_default)
     } else NA_integer_,
@@ -381,8 +390,9 @@ tryCatch({
     } else NA_integer_,
     sex_restriction_target_default = if ("sex_restriction_target_default" %in% names(cm)) {
       as.character(sex_restriction_target_default)
-    } else NA_character_
+      } else NA_character_
   )]
+  cm <- add_pandemic_component_flags(cm)
   
   pop <- pop[, .(
     year_id = as.integer(year_id),
@@ -404,17 +414,43 @@ tryCatch({
   ltm[mx < 0, mx := NA_real_]
   
   cm_term <- cm[is_terminal == TRUE & cause_concept_id > 0]
+  write_qc(
+    cm_term[pandemic_component_class %in% c("covid_specific", "measles", "lri", "pertussis", "oprm"),
+      .(
+        cause_concept_id,
+        cause_name,
+        pandemic_component_class,
+        is_pandemic_named_component,
+        is_covid_specific,
+        is_oprm
+      )
+    ][order(match(pandemic_component_class, c("covid_specific", "measles", "lri", "pertussis", "oprm")), cause_name)],
+    "qc_pandemic_component_catalog.csv"
+  )
   leaf <- leaf[cause_concept_id > 0]
-  
+
   leaf <- merge(
     leaf,
-    cm_term[, .(cause_concept_id, is_covid_related)],
+    cm_term[, .(
+      cause_concept_id,
+      is_covid_related,
+      is_covid_specific,
+      is_oprm,
+      pandemic_component_class,
+      is_pandemic_named_component,
+      is_pandemic_related_any
+    )],
     by = "cause_concept_id",
     all.x = TRUE,
     sort = FALSE
   )
-  
+
   leaf[is.na(is_covid_related), is_covid_related := FALSE]
+  leaf[is.na(is_covid_specific), is_covid_specific := FALSE]
+  leaf[is.na(is_oprm), is_oprm := FALSE]
+  leaf[is.na(pandemic_component_class), pandemic_component_class := "non_pandemic"]
+  leaf[is.na(is_pandemic_named_component), is_pandemic_named_component := FALSE]
+  leaf[is.na(is_pandemic_related_any), is_pandemic_related_any := FALSE]
   
   # ----------------------------------------------------------
   # Armonización geográfica a departamento y re-agregación
@@ -422,14 +458,19 @@ tryCatch({
   leaf <- leaf[
     ,
     .(
-      deaths_post_redistribution = sum(deaths_post_redistribution, na.rm = TRUE),
-      deaths_observed = sum(deaths_observed, na.rm = TRUE),
-      deaths_input_semantic = unique(deaths_input_semantic)[1],
-      location_id_semantic = unique(location_id_semantic)[1],
-      is_covid_related = unique(is_covid_related)[1]
-    ),
-    by = .(year_id, location_id, sex_id, age, cause_concept_id)
-  ]
+        deaths_post_redistribution = sum(deaths_post_redistribution, na.rm = TRUE),
+        deaths_observed = sum(deaths_observed, na.rm = TRUE),
+        deaths_input_semantic = unique(deaths_input_semantic)[1],
+        location_id_semantic = unique(location_id_semantic)[1],
+        is_covid_related = unique(is_covid_related)[1],
+        is_covid_specific = unique(is_covid_specific)[1],
+        is_oprm = unique(is_oprm)[1],
+        pandemic_component_class = unique(pandemic_component_class)[1],
+        is_pandemic_named_component = unique(is_pandemic_named_component)[1],
+        is_pandemic_related_any = unique(is_pandemic_related_any)[1]
+      ),
+      by = .(year_id, location_id, sex_id, age, cause_concept_id)
+    ]
   
   qc_geo_harmonization <- leaf[
     ,
@@ -497,8 +538,9 @@ tryCatch({
   # ----------------------------------------------------------
   qc_missing_external_summary <- fac_base[, .(
     n_cells = .N,
-    n_missing_external = sum(external_status != "ok", na.rm = TRUE),
-    prop_missing_external = mean(external_status != "ok", na.rm = TRUE)
+    n_missing_external = sum(!external_status %in% c("ok", "structural_zero_population"), na.rm = TRUE),
+    n_structural_zero_population = sum(external_status == "structural_zero_population", na.rm = TRUE),
+    prop_missing_external = mean(!external_status %in% c("ok", "structural_zero_population"), na.rm = TRUE)
   ), by = .(year_id)][order(year_id)]
   
   qc_missing_external_examples <- fac_base[
@@ -511,7 +553,7 @@ tryCatch({
   
   prep_missing_prop <- fac_base[
     year_id %in% CFG$prepandemic_years,
-    mean(external_status != "ok", na.rm = TRUE)
+    mean(!external_status %in% c("ok", "structural_zero_population"), na.rm = TRUE)
   ]
   
   if (isTRUE(CFG$hard_fail_on_missing_external_prepandemic) &&
@@ -537,28 +579,16 @@ tryCatch({
     0
   )]
 
-  covid_causes <- cm_term[is_covid_related == TRUE, cause_concept_id]
-  fallback_names <- c("Other pandemic related mortality (OPRM)", "COVID-19")
-  pandemic_target_fallback_id <- NA_integer_
-  for (nm in fallback_names) {
-    hit <- cm_term[is_covid_related == TRUE & cause_name == nm, cause_concept_id][1]
-    if (length(hit) > 0L && !is.na(hit)) {
-      pandemic_target_fallback_id <- as.integer(hit)
-      break
-    }
-  }
-  if (is.na(pandemic_target_fallback_id)) {
-    pandemic_target_fallback_id <- covid_causes[1]
-  }
-  if (length(pandemic_target_fallback_id) == 0L || is.na(pandemic_target_fallback_id)) {
-    stop("QC HARD FAIL: no existe una causa terminal is_covid_related para alojar la reasignación pandémica.")
+  oprm_target_id <- cm_term[pandemic_component_class == "oprm", cause_concept_id][1]
+  if (length(oprm_target_id) == 0L || is.na(oprm_target_id)) {
+    stop("QC HARD FAIL: no existe una causa terminal OPRM para alojar la reasignacion pandemica.")
   }
 
-  covid_presence <- unique(
-    leaf[, .(year_id, location_id, sex_id, age, cause_concept_id, is_covid_related)]
+  pandemic_target_presence <- unique(
+    leaf[, .(year_id, location_id, sex_id, age, cause_concept_id, pandemic_component_class)]
   )[
     ,
-    .(n_covid_targets_present = sum(is_covid_related == TRUE, na.rm = TRUE)),
+    .(n_oprm_targets_present = sum(pandemic_component_class == "oprm", na.rm = TRUE)),
     by = .(year_id, location_id, sex_id, age)
   ]
 
@@ -567,24 +597,29 @@ tryCatch({
       pandemic_excess_allcause > 0,
       .(year_id, location_id, sex_id, age, pandemic_excess_allcause)
     ],
-    covid_presence,
+    pandemic_target_presence,
     by = c("year_id", "location_id", "sex_id", "age"),
     all.x = TRUE,
     sort = FALSE
   )
-  synthetic_pandemic_target_cells[is.na(n_covid_targets_present), n_covid_targets_present := 0L]
+  synthetic_pandemic_target_cells[is.na(n_oprm_targets_present), n_oprm_targets_present := 0L]
   synthetic_pandemic_target_cells <- synthetic_pandemic_target_cells[
-    n_covid_targets_present <= 0
+    n_oprm_targets_present <= 0
   ][
     ,
     .(
       year_id, location_id, sex_id, age,
-      cause_concept_id = as.integer(pandemic_target_fallback_id),
+      cause_concept_id = as.integer(oprm_target_id),
       deaths_post_redistribution = 0,
       deaths_observed = 0,
-      deaths_input_semantic = "synthetic_pandemic_target_zero_base",
+      deaths_input_semantic = "synthetic_oprm_target_zero_base",
       location_id_semantic = "harmonized_to_department_from_fine_geo_input",
       is_covid_related = TRUE,
+      is_covid_specific = FALSE,
+      is_oprm = TRUE,
+      pandemic_component_class = "oprm",
+      is_pandemic_named_component = FALSE,
+      is_pandemic_related_any = TRUE,
       pandemic_excess_allcause
     )
   ]
@@ -615,11 +650,13 @@ tryCatch({
   # pandémico entra a causas elegibles covid y sale del resto
   # de causas letales no-covid dentro de la misma celda.
   # ----------------------------------------------------------
-  msg("Distribuyendo exceso pandémico con reasignación contable explícita...")
+  msg("Distribuyendo exceso pandemico con definicion canonica de OPRM...")
   
   pandemic_alloc <- merge(
     leaf[, .(
-      year_id, location_id, sex_id, age, cause_concept_id, is_covid_related,
+      year_id, location_id, sex_id, age, cause_concept_id,
+      is_covid_related, is_covid_specific, is_oprm,
+      pandemic_component_class, is_pandemic_named_component,
       deaths_post_redistribution
     )],
     fac_base[, .(
@@ -639,58 +676,58 @@ tryCatch({
   pandemic_alloc[
     ,
     `:=`(
-      covid_base_sum = sum(base_cause_deaths_corrected[is_covid_related == TRUE], na.rm = TRUE),
-      noncovid_lethal_base_sum = sum(base_cause_deaths_corrected[is_covid_related == FALSE], na.rm = TRUE),
-      n_covid_targets = sum(is_covid_related == TRUE, na.rm = TRUE),
-      n_noncovid_sources = sum(is_covid_related == FALSE, na.rm = TRUE)
+      pandemic_named_component_allcause = sum(base_cause_deaths_corrected[is_pandemic_named_component == TRUE], na.rm = TRUE),
+      nonpandemic_source_sum = sum(base_cause_deaths_corrected[pandemic_component_class == "non_pandemic"], na.rm = TRUE),
+      oprm_existing_base = sum(base_cause_deaths_corrected[pandemic_component_class == "oprm"], na.rm = TRUE),
+      n_oprm_targets = sum(pandemic_component_class == "oprm", na.rm = TRUE),
+      n_nonpandemic_sources = sum(pandemic_component_class == "non_pandemic", na.rm = TRUE)
     ),
     by = .(year_id, location_id, sex_id, age)
   ]
   
+  pandemic_alloc[, pandemic_named_component_capped := pmin(pandemic_excess_allcause, pandemic_named_component_allcause)]
+  pandemic_alloc[, oprm_residual_allcause := pmax(0, pandemic_excess_allcause - pandemic_named_component_capped)]
   pandemic_alloc[, pandemic_reallocation_source_mode := fifelse(
-    noncovid_lethal_base_sum > 0 & pandemic_excess_allcause <= noncovid_lethal_base_sum, "noncovid_only",
+    oprm_residual_allcause <= 0, "none_needed",
     fifelse(
-      noncovid_lethal_base_sum > 0 & pandemic_excess_allcause > noncovid_lethal_base_sum & covid_base_sum > 0,
-      "noncovid_plus_covid_remainder",
-      fifelse(covid_base_sum > 0, "covid_only", "none")
+      nonpandemic_source_sum > 0 & n_oprm_targets > 0 & oprm_residual_allcause <= (nonpandemic_source_sum + 1e-8),
+      "nonpandemic_to_oprm",
+      "ineligible"
     )
   )]
-  pandemic_alloc[, covid_weight := 0]
-  pandemic_alloc[, covid_source_weight := 0]
+  pandemic_alloc[, oprm_weight := 0]
   pandemic_alloc[, noncovid_source_weight := 0]
   pandemic_alloc[, pandemic_reallocation_source_weight := 0]
   
   pandemic_alloc[
-    is_covid_related == TRUE & covid_base_sum > 0,
-    covid_weight := base_cause_deaths_corrected / covid_base_sum
+    pandemic_component_class == "oprm" & oprm_existing_base > 0,
+    oprm_weight := base_cause_deaths_corrected / oprm_existing_base
   ]
   pandemic_alloc[
-    is_covid_related == TRUE & covid_base_sum > 0,
-    covid_source_weight := base_cause_deaths_corrected / covid_base_sum
-  ]
-  pandemic_alloc[
-    is_covid_related == TRUE & covid_base_sum <= 0 & n_covid_targets > 0,
-    covid_weight := 1 / n_covid_targets
+    pandemic_component_class == "oprm" & oprm_existing_base <= 0 & n_oprm_targets > 0,
+    oprm_weight := 1 / n_oprm_targets
   ]
   
   pandemic_alloc[
-    is_covid_related == FALSE & noncovid_lethal_base_sum > 0,
-    noncovid_source_weight := base_cause_deaths_corrected / noncovid_lethal_base_sum
+    pandemic_component_class == "non_pandemic" & nonpandemic_source_sum > 0,
+    noncovid_source_weight := base_cause_deaths_corrected / nonpandemic_source_sum
   ]
   qc_pandemic_reallocation_eligibility_failures <- unique(
     pandemic_alloc[
-      pandemic_excess_allcause > 0 &
+      oprm_residual_allcause > 0 &
         (
-          n_covid_targets <= 0 |
-            pandemic_reallocation_source_mode == "none"
+          n_oprm_targets <= 0 |
+            pandemic_reallocation_source_mode == "ineligible"
         ),
       .(
         year_id, location_id, sex_id, age,
         pandemic_excess_allcause,
-        covid_base_sum,
-        noncovid_lethal_base_sum,
-        n_covid_targets,
-        n_noncovid_sources,
+        pandemic_named_component_allcause,
+        pandemic_named_component_capped,
+        oprm_residual_allcause,
+        nonpandemic_source_sum,
+        n_oprm_targets,
+        n_nonpandemic_sources,
         pandemic_reallocation_source_mode
       )
     ]
@@ -699,56 +736,60 @@ tryCatch({
   
   if (nrow(qc_pandemic_reallocation_eligibility_failures) > 0L) {
     stop(
-      "QC HARD FAIL: existen celdas con exceso pandémico positivo que no pueden cerrarse ",
-      "con reasignación explícita desde otros grupos letales. ",
+      "QC HARD FAIL: existen celdas con exceso pandemico positivo que no pueden cerrarse ",
+      "con la definicion canonica de OPRM. ",
       "Revisar qc_pandemic_reallocation_eligibility_failures.csv"
     )
   }
   
-  pandemic_alloc[, pandemic_excess_component := fifelse(
-    is_covid_related == TRUE,
-    pandemic_excess_allcause * covid_weight,
+  pandemic_alloc[, pandemic_named_component := fifelse(
+    is_pandemic_named_component == TRUE,
+    base_cause_deaths_corrected,
     0
   )]
+  pandemic_alloc[, oprm_residual_component := fifelse(
+    pandemic_component_class == "oprm",
+    oprm_residual_allcause * oprm_weight,
+    0
+  )]
+  pandemic_alloc[, pandemic_excess_component := oprm_residual_component]
   pandemic_alloc[, noncovid_out_requested := fifelse(
-    is_covid_related == FALSE & noncovid_lethal_base_sum > 0,
-    pandemic_excess_allcause * noncovid_source_weight,
+    pandemic_component_class == "non_pandemic" & nonpandemic_source_sum > 0,
+    oprm_residual_allcause * noncovid_source_weight,
     0
   )]
   pandemic_alloc[, pandemic_reassigned_out_component := fifelse(
-    is_covid_related == FALSE,
+    pandemic_component_class == "non_pandemic",
     pmin(base_cause_deaths_corrected, noncovid_out_requested),
     0
   )]
   pandemic_alloc[
     ,
-    actual_noncovid_out_sum := sum(pandemic_reassigned_out_component[is_covid_related == FALSE], na.rm = TRUE),
+    actual_noncovid_out_sum := sum(pandemic_reassigned_out_component[pandemic_component_class == "non_pandemic"], na.rm = TRUE),
     by = .(year_id, location_id, sex_id, age)
   ]
   pandemic_alloc[
     ,
-    pandemic_remainder_after_noncovid := pmax(0, pandemic_excess_allcause - actual_noncovid_out_sum)
+    actual_oprm_in_sum := sum(oprm_residual_component[pandemic_component_class == "oprm"], na.rm = TRUE),
+    by = .(year_id, location_id, sex_id, age)
   ]
-  pandemic_alloc[
-    is_covid_related == TRUE & pandemic_remainder_after_noncovid > 0,
-    pandemic_reassigned_out_component := pandemic_reassigned_out_component + (pandemic_remainder_after_noncovid * covid_source_weight)
-  ]
+  pandemic_alloc[, oprm_residual_unfunded := pmax(0, oprm_residual_allcause - actual_noncovid_out_sum)]
   pandemic_alloc[, pandemic_reallocation_source_weight := fifelse(
-    pandemic_excess_allcause > 0,
-    pandemic_reassigned_out_component / pandemic_excess_allcause,
+    oprm_residual_allcause > 0,
+    pandemic_reassigned_out_component / oprm_residual_allcause,
     0
   )]
   
   qc_pandemic_component_noneligible <- pandemic_alloc[
-    (is_covid_related == FALSE & pandemic_excess_component > 1e-10) |
-      (pandemic_reallocation_source_mode == "noncovid_only" & is_covid_related == TRUE & pandemic_reassigned_out_component > 1e-10) |
-      (pandemic_reallocation_source_mode == "covid_only" & is_covid_related == FALSE & pandemic_reassigned_out_component > 1e-10)
+    (pandemic_component_class != "oprm" & pandemic_excess_component > 1e-10) |
+      (pandemic_component_class != "non_pandemic" & pandemic_reassigned_out_component > 1e-10) |
+      (oprm_residual_unfunded > 1e-10)
   ][order(year_id, location_id, sex_id, age, cause_concept_id)]
   write_qc(qc_pandemic_component_noneligible, "qc_pandemic_component_noneligible.csv")
   
   if (nrow(qc_pandemic_component_noneligible) > 0L) {
     stop(
-      "QC HARD FAIL: se detectó componente pandémico en causas no elegibles o salida contable desde causas covid. ",
+      "QC HARD FAIL: se detecto componente pandemico fuera de OPRM o salida contable fuera de causas no pandemicas. ",
       "Revisar qc_pandemic_component_noneligible.csv"
     )
   }
@@ -756,10 +797,15 @@ tryCatch({
   pandemic_alloc <- pandemic_alloc[, .(
     year_id, location_id, sex_id, age, cause_concept_id,
     base_cause_deaths_corrected,
-    covid_base_sum,
-    covid_weight,
-    covid_source_weight,
-    noncovid_lethal_base_sum,
+    pandemic_component_class,
+    pandemic_named_component,
+    pandemic_named_component_allcause,
+    pandemic_named_component_capped,
+    oprm_existing_base,
+    oprm_weight,
+    oprm_residual_allcause,
+    oprm_residual_component,
+    nonpandemic_source_sum,
     noncovid_source_weight,
     pandemic_reallocation_source_mode,
     pandemic_reallocation_source_weight,
@@ -812,11 +858,18 @@ tryCatch({
   final[is.na(correction_factor_completeness), correction_factor_completeness := 1]
   final[is.na(pandemic_excess_component), pandemic_excess_component := 0]
   final[is.na(base_cause_deaths_corrected), base_cause_deaths_corrected := deaths_post_redistribution * correction_factor_completeness]
-  final[is.na(covid_weight), covid_weight := 0]
-  final[is.na(covid_base_sum), covid_base_sum := 0]
-  final[is.na(noncovid_lethal_base_sum), noncovid_lethal_base_sum := 0]
+  final[is.na(pandemic_named_component), pandemic_named_component := 0]
+  final[is.na(pandemic_named_component_allcause), pandemic_named_component_allcause := 0]
+  final[is.na(pandemic_named_component_capped), pandemic_named_component_capped := 0]
+  final[is.na(oprm_existing_base), oprm_existing_base := 0]
+  final[is.na(oprm_weight), oprm_weight := 0]
+  final[is.na(oprm_residual_allcause), oprm_residual_allcause := 0]
+  final[is.na(oprm_residual_component), oprm_residual_component := 0]
+  final[is.na(nonpandemic_source_sum), nonpandemic_source_sum := 0]
   final[is.na(noncovid_source_weight), noncovid_source_weight := 0]
   final[is.na(pandemic_reassigned_out_component), pandemic_reassigned_out_component := 0]
+  final[is.na(pandemic_component_class), pandemic_component_class := "non_pandemic"]
+  final[, subregistro_gain_component := pmax(0, base_cause_deaths_corrected - deaths_post_redistribution)]
   
   final[, deaths_final_net_of_pandemic := base_cause_deaths_corrected - pandemic_reassigned_out_component]
   final[, deaths_final := deaths_final_net_of_pandemic + pandemic_excess_component]
@@ -879,13 +932,19 @@ tryCatch({
       population = unique(population[!is.na(population)])[1],
       mx = unique(mx[!is.na(mx)])[1],
       cause_name = unique(cause_name[!is.na(cause_name)])[1],
-      covid_base_sum = unique(covid_base_sum[!is.na(covid_base_sum)])[1],
-      covid_weight = sum(covid_weight, na.rm = TRUE),
-      covid_source_weight = sum(covid_source_weight, na.rm = TRUE),
-      noncovid_lethal_base_sum = unique(noncovid_lethal_base_sum[!is.na(noncovid_lethal_base_sum)])[1],
+      pandemic_component_class = unique(pandemic_component_class[!is.na(pandemic_component_class)])[1],
+      pandemic_named_component = sum(pandemic_named_component, na.rm = TRUE),
+      pandemic_named_component_allcause = unique(pandemic_named_component_allcause[!is.na(pandemic_named_component_allcause)])[1],
+      pandemic_named_component_capped = unique(pandemic_named_component_capped[!is.na(pandemic_named_component_capped)])[1],
+      oprm_existing_base = unique(oprm_existing_base[!is.na(oprm_existing_base)])[1],
+      oprm_weight = sum(oprm_weight, na.rm = TRUE),
+      oprm_residual_allcause = unique(oprm_residual_allcause[!is.na(oprm_residual_allcause)])[1],
+      oprm_residual_component = sum(oprm_residual_component, na.rm = TRUE),
+      nonpandemic_source_sum = unique(nonpandemic_source_sum[!is.na(nonpandemic_source_sum)])[1],
       noncovid_source_weight = sum(noncovid_source_weight, na.rm = TRUE),
       pandemic_reallocation_source_mode = unique(pandemic_reallocation_source_mode[!is.na(pandemic_reallocation_source_mode)])[1],
       pandemic_reallocation_source_weight = sum(pandemic_reallocation_source_weight, na.rm = TRUE),
+      subregistro_gain_component = sum(subregistro_gain_component, na.rm = TRUE),
       deaths_observed_semantic = unique(deaths_observed_semantic)[1],
       deaths_input_semantic = unique(deaths_input_semantic)[1],
       correction_factor_preclip = unique(correction_factor_preclip[!is.na(correction_factor_preclip)])[1],
@@ -907,7 +966,9 @@ tryCatch({
     "cause_name",
     "deaths_observed", "deaths_post_redistribution", "base_cause_deaths_corrected",
     "deaths_final_net_of_pandemic", "deaths_final",
-    "correction_factor_completeness", "pandemic_excess_component",
+    "correction_factor_completeness", "subregistro_gain_component",
+    "pandemic_component_class", "pandemic_named_component",
+    "oprm_residual_component", "pandemic_excess_component",
     "pandemic_reassigned_out_component", "run_id"
   ))
   
@@ -950,12 +1011,24 @@ tryCatch({
     pandemic_excess = sum(pandemic_excess_component, na.rm = TRUE)
   ), by = .(year_id)][order(year_id)]
   
-  qc_pandemic_by_year <- fac_base[, .(
+  qc_pandemic_by_year <- final[, .(
     observed_allcause = sum(observed_allcause, na.rm = TRUE),
     expected_allcause = sum(expected_allcause, na.rm = TRUE),
     observed_corrected_allcause = sum(observed_corrected_allcause, na.rm = TRUE),
-    pandemic_excess_allcause = sum(pandemic_excess_allcause, na.rm = TRUE)
-  ), by = .(year_id)][order(year_id)]
+    pandemic_excess_allcause = sum(unique(pandemic_excess_allcause[!is.na(pandemic_excess_allcause)]), na.rm = TRUE),
+    pandemic_named_component_allcause = sum(unique(pandemic_named_component_allcause[!is.na(pandemic_named_component_allcause)]), na.rm = TRUE),
+    oprm_residual_allcause = sum(unique(oprm_residual_allcause[!is.na(oprm_residual_allcause)]), na.rm = TRUE)
+  ), by = .(year_id, location_id, sex_id, age)][
+    , .(
+      observed_allcause = sum(observed_allcause, na.rm = TRUE),
+      expected_allcause = sum(expected_allcause, na.rm = TRUE),
+      observed_corrected_allcause = sum(observed_corrected_allcause, na.rm = TRUE),
+      pandemic_excess_allcause = sum(pandemic_excess_allcause, na.rm = TRUE),
+      pandemic_named_component_allcause = sum(pandemic_named_component_allcause, na.rm = TRUE),
+      oprm_residual_allcause = sum(oprm_residual_allcause, na.rm = TRUE)
+    ),
+    by = .(year_id)
+  ][order(year_id)]
   
   qc_pandemic_reallocation_balance <- final[
     ,
@@ -967,11 +1040,13 @@ tryCatch({
       total_pandemic_out = sum(pandemic_reassigned_out_component, na.rm = TRUE),
       expected_allcause = unique(expected_allcause[!is.na(expected_allcause)])[1],
       observed_corrected_allcause = unique(observed_corrected_allcause[!is.na(observed_corrected_allcause)])[1],
-      pandemic_excess_allcause = unique(pandemic_excess_allcause[!is.na(pandemic_excess_allcause)])[1]
+      pandemic_excess_allcause = unique(pandemic_excess_allcause[!is.na(pandemic_excess_allcause)])[1],
+      pandemic_named_component_allcause = unique(pandemic_named_component_allcause[!is.na(pandemic_named_component_allcause)])[1],
+      oprm_residual_allcause = unique(oprm_residual_allcause[!is.na(oprm_residual_allcause)])[1]
     ),
     by = .(year_id, location_id, sex_id, age)
   ]
-  qc_pandemic_reallocation_balance[, target_final_net := observed_corrected_allcause - pandemic_excess_allcause]
+  qc_pandemic_reallocation_balance[, target_final_net := observed_corrected_allcause - oprm_residual_allcause]
   qc_pandemic_reallocation_balance[, `:=`(
     delta_base_vs_corrected = total_base_corrected - observed_corrected_allcause,
     delta_net_vs_target = total_final_net - target_final_net,
@@ -1047,15 +1122,19 @@ tryCatch({
     correction_factor_completeness,
     deaths_final_net_of_pandemic,
     pandemic_reassigned_out_component,
+    pandemic_named_component,
+    pandemic_named_component_allcause,
+    pandemic_named_component_capped,
+    oprm_residual_allcause,
+    oprm_residual_component,
     pandemic_excess_component,
     deaths_final,
-    noncovid_lethal_base_sum,
+    nonpandemic_source_sum,
     noncovid_source_weight,
     pandemic_reallocation_source_mode,
     pandemic_reallocation_source_weight,
-    covid_base_sum,
-    covid_weight,
-    covid_source_weight,
+    pandemic_component_class,
+    subregistro_gain_component,
     run_id
   )][order(year_id, location_id, sex_id, age, cause_concept_id)]
   

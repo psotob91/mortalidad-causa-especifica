@@ -1,0 +1,20 @@
+---
+lang: es
+title: "Portal técnico"
+subtitle: "Salida PDF automatizada"
+format:
+  pdf:
+    toc: true
+    number-sections: true
+    geometry:
+      - margin=1.8cm
+params:
+  title: "Portal técnico"
+  subtitle: ""
+  body_md: ""
+---
+
+```{r results='asis'}
+body <- readLines(params$body_md, warn = FALSE, encoding = 'UTF-8')
+cat(paste(body, collapse = '\n'))
+```

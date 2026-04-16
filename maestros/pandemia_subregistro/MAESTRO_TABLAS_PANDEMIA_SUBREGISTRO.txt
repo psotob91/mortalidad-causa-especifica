@@ -1,0 +1,56 @@
+MAESTRO DE TABLAS Y NARRATIVA: PANDEMIA Y SUBREGISTRO
+
+PROPOSITO
+- Fijar la semantica publica y tecnica del modulo pandemia-subregistro.
+- Evitar mezclar correccion por subregistro con reasignacion pandemica.
+
+REGLA SEMANTICA CENTRAL
+- La correccion por subregistro aumenta la masa total all-cause observada hacia una masa corregida.
+- La reasignacion pandemica no cambia la masa total corregida.
+- La reasignacion pandemica solo mueve muertes y AVP entre causas dentro de la misma masa corregida.
+
+DEFINICION CANONICA DE OPRM
+- OPRM residual = exceso de mortalidad all-cause - (COVID-19 especifico + sarampion + infecciones respiratorias inferiores + tos ferina).
+- Si el componente nombrado supera el exceso all-cause, OPRM residual se trunca a cero.
+
+REGLA DE NOMENCLATURA
+- No usar redistribucion para la etapa pandemica.
+- Usar reasignacion pandemica.
+- Usar subregistro o completitud para el factor que infla la masa.
+
+NOTA SEMANTICA OBLIGATORIA
+- En la version actual del pipeline, deaths_observed y deaths_post_redistribution son equivalentes en masa.
+- Esa equivalencia debe explicitarse y no mostrarse como si fueran dos etapas distintas.
+
+TABLAS OBLIGATORIAS
+- Tabla P1. Impacto total de subregistro por ano.
+- Tabla P2. Impacto total de pandemia por ano.
+- Tabla P3. Antes, despues y cambio por grupo causal para completitud.
+- Tabla P4. Antes, despues y cambio por grupo causal para reasignacion pandemica.
+- Tabla P5. Balance pandémico QC por celda.
+- Tabla P6. Resumen de estabilidad del factor de completitud.
+
+COLUMNAS MINIMAS
+- P1: muertes y AVP antes y despues de completitud, cambio absoluto y porcentaje.
+- P2: exceso all-cause, componente pandemico nombrado, OPRM residual, reasignado desde otras causas y sus AVP.
+- P3 y P4: grupo causal, etapa, muertes, porcentaje, AVP y porcentaje.
+- P5: delta_base_vs_corrected, delta_net_vs_target, delta_final_vs_corrected, delta_in_vs_out, veredicto.
+- P6: min, p25, mediana, p75, max, clipping bajo, clipping alto, backoff.
+
+REGLAS NARRATIVAS
+- Explicar primero que subregistro infla y pandemia reasigna.
+- Cuantificar cuanto aumenta la masa por subregistro.
+- Cuantificar cuanto del exceso termina como OPRM residual.
+- Explicar que el componente pandemico nombrado puede absorber todo el exceso en algunos anos.
+- Resumir que el balance pandemico preserva masa corregida si las QC estan en OK.
+
+REGLAS DE QC
+- correction_factor_completeness nunca debe ser menor que 1.
+- base_cause_deaths_corrected nunca debe ser menor que deaths_post_redistribution.
+- pandemic_excess_component solo puede entrar a OPRM.
+- pandemic_reassigned_out_component solo puede salir de causas no pandemicas.
+- La reasignacion pandemica debe cerrar contablemente por celda.
+
+REGLA DE PRESENTACION
+- El producto principal debe ser tabular y narrativo.
+- Los graficos, si existen, son secundarios.

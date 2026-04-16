@@ -1,0 +1,83 @@
+---
+title: "Informe metodológico de ajustes"
+subtitle: "Redistribución, pandemia y subregistro"
+lang: es
+format:
+  pdf:
+    toc: true
+    toc-title: "Índice"
+    number-sections: true
+    geometry: margin=1.8cm
+execute:
+  echo: false
+  warning: false
+  message: false
+---
+
+```{r setup}
+library(data.table); library(knitr)
+table_dir <- "C:/Users/Usuario/OneDrive/Consultorias_Personales/Carga-CDC-Peru-2023/carga-enfermedad-peru-2018-2024/mortalidad-causa-especifica/reports/methodological_adjustment_report/tables"
+```
+
+# Redistribución
+
+La redistribución se presenta con lógica ABDS: grupos, magnitud total, perfil por edad y sexo, cambio before/after y caso trazado.
+
+```{r}
+t31 <- fread(file.path(table_dir, 'table_3_1_redistribution_groups.csv'))
+kable(t31, caption = 'Tabla 3.1. Grupos de redistribución, método y alcance')
+```
+
+```{r}
+t32 <- fread(file.path(table_dir, 'table_3_2_impact_total_by_year.csv'))
+kable(t32, caption = 'Tabla 3.2. Muertes y AVP redistribuidos por año')
+```
+
+```{r}
+t33 <- fread(file.path(table_dir, 'table_3_3_impact_by_age_sex_year.csv'))
+kable(t33, caption = 'Tabla 3.3. Muertes y AVP redistribuidos por edad y sexo')
+```
+
+```{r}
+t34 <- fread(file.path(table_dir, 'table_3_4_before_after_by_disease_group.csv'))
+kable(t34, caption = 'Tabla 3.4. Before/after por grupo de enfermedad')
+```
+
+# Pandemia y subregistro
+
+En este proyecto, subregistro y reasignación pandémica son mecanismos distintos. El subregistro aumenta la masa total corregida. La pandemia preserva esa masa y solo reasigna causa. Además, `deaths_observed` y `deaths_post_redistribution` son equivalentes en la versión actual del pipeline.
+
+```{r}
+p1 <- fread(file.path(table_dir, 'tabla_p1_subregistro_total_por_anio.csv'))
+kable(p1, caption = 'Tabla P1. Impacto total de subregistro por año')
+```
+
+```{r}
+p2 <- fread(file.path(table_dir, 'tabla_p2_pandemia_total_por_anio.csv'))
+kable(p2, caption = 'Tabla P2. Impacto pandémico total por año')
+```
+
+```{r}
+p3 <- fread(file.path(table_dir, 'tabla_p3_before_after_por_grupo_causal_subregistro.csv'))
+kable(p3[p3$year_id == max(p3$year_id), ], caption = 'Tabla P3. Before/after de completitud por grupo causal, último año')
+```
+
+```{r}
+p4 <- fread(file.path(table_dir, 'tabla_p4_before_after_por_grupo_causal_pandemia.csv'))
+kable(p4[p4$year_id == max(p4$year_id), ], caption = 'Tabla P4. Before/after de reasignación pandémica por grupo causal, último año')
+```
+
+```{r}
+p5 <- fread(file.path(table_dir, 'tabla_p5_balance_pandemico_qc.csv'))
+kable(head(p5, 40), caption = 'Tabla P5. Balance pandémico QC - muestra')
+```
+
+```{r}
+p6 <- fread(file.path(table_dir, 'tabla_p6_factor_completitud_resumen.csv'))
+kable(p6, caption = 'Tabla P6. Resumen del factor de completitud')
+```
+
+```{r}
+x1 <- fread(file.path(table_dir, 'tabla_x1_conciliacion_redistribucion_pandemia_subregistro.csv'))
+kable(x1, caption = 'Tabla X1. Conciliacion entre redistribucion y pandemia/subregistro')
+```

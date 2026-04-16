@@ -1,0 +1,36 @@
+resolutions:
+  - source_qc: "qc_age_specific_mismatch_positive.csv"
+    downstream_qc: "qc_age_specific_mismatch_positive_final.csv"
+    reference: "08. Mortalidad final con completitud y pandemia / qc_age_specific_mismatch_positive_final.csv"
+    resolution_text: "El problema apareció durante el mapeo y la redistribución inicial, pero el QC final de mortalidad ya quedó vacío. Esto indica que la incompatibilidad por edad fue corregida antes del resultado final."
+    unresolved_text: "La incompatibilidad por edad detectada aguas arriba no quedó cerrada por el QC final correspondiente."
+
+  - source_qc: "qc_sex_specific_mismatch_positive.csv"
+    downstream_qc: "qc_sex_specific_mismatch_positive_final.csv"
+    reference: "08. Mortalidad final con completitud y pandemia / qc_sex_specific_mismatch_positive_final.csv"
+    resolution_text: "El problema apareció durante el mapeo y la redistribución inicial, pero el QC final de mortalidad ya quedó vacío. Esto indica que la incompatibilidad por sexo fue corregida antes del resultado final."
+    unresolved_text: "La incompatibilidad por sexo detectada aguas arriba no quedó cerrada por el QC final correspondiente."
+
+  - source_qc: "qc_age_specific_mismatch_positive_final.csv"
+    downstream_qc: "qc_age_specific_mismatch_positive_smoothed.csv"
+    reference: "11. Tasas de mortalidad y suavizamiento / qc_age_specific_mismatch_positive_smoothed.csv"
+    resolution_text: "La incompatibilidad por edad no reapareció después del cálculo y suavizamiento de tasas, por lo que el hallazgo quedó resuelto downstream."
+    unresolved_text: "La incompatibilidad por edad reapareció o no quedó demostrablemente cerrada en la capa de tasas."
+
+  - source_qc: "qc_sex_specific_mismatch_positive_final.csv"
+    downstream_qc: "qc_sex_specific_mismatch_positive_smoothed.csv"
+    reference: "11. Tasas de mortalidad y suavizamiento / qc_sex_specific_mismatch_positive_smoothed.csv"
+    resolution_text: "La incompatibilidad por sexo no reapareció después del cálculo y suavizamiento de tasas, por lo que el hallazgo quedó resuelto downstream."
+    unresolved_text: "La incompatibilidad por sexo reapareció o no quedó demostrablemente cerrada en la capa de tasas."
+
+  - source_qc: "qc_age_specific_mismatch_positive_smoothed.csv"
+    downstream_qc: "qc_age_specific_mismatch_positive_avp.csv"
+    reference: "13. Calculo de AVP y YLL / qc_age_specific_mismatch_positive_avp.csv"
+    resolution_text: "La incompatibilidad por edad no persistió en AVP/YLL, lo que confirma que el flujo downstream cerró la señal previa."
+    unresolved_text: "La incompatibilidad por edad siguió visible o no quedó descartada en AVP/YLL."
+
+  - source_qc: "qc_sex_specific_mismatch_positive_smoothed.csv"
+    downstream_qc: "qc_sex_specific_mismatch_positive_avp.csv"
+    reference: "13. Calculo de AVP y YLL / qc_sex_specific_mismatch_positive_avp.csv"
+    resolution_text: "La incompatibilidad por sexo no persistió en AVP/YLL, lo que confirma que el flujo downstream cerró la señal previa."
+    unresolved_text: "La incompatibilidad por sexo siguió visible o no quedó descartada en AVP/YLL."

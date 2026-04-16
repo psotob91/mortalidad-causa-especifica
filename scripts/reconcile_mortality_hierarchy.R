@@ -46,12 +46,17 @@ source(here("R", "io_utils.R"))
 source(here("R", "catalog_utils.R"))
 source(here("R", "spec_utils.R"))
 
+smoothed_input_override <- Sys.getenv("RECON_INPUT_SMOOTHED_PATH", unset = "")
+output_suffix <- Sys.getenv("RECON_OUTPUT_SUFFIX", unset = "")
+output_suffix_path <- if (nzchar(output_suffix)) paste0("_", output_suffix) else ""
+
 CFG <- list(
   version = "v0.1.0_reconciled_deadline",
   dataset_id = "mortality_rate_cause_smoothed_reconciled",
   table_name = "mortality_rate_cause_smoothed_reconciled",
   
   input_smoothed_candidates = c(
+    if (nzchar(smoothed_input_override)) smoothed_input_override,
     here("data", "final", "mortality_rate_cause_smoothed", "mortality_rate_cause_smoothed.parquet"),
     here("data", "final", "mortality_rate_cause_smoothed", "mortality_rate_cause_smoothed.csv")
   ),
@@ -68,8 +73,8 @@ CFG <- list(
   
   external_yaml_path = here("config", "external_sources.yml"),
   
-  out_dir = here("data", "final", "mortality_rate_cause_smoothed_reconciled"),
-  qc_dir  = qc_dir_path("reconcile_mortality_hierarchy"),
+  out_dir = here("data", "final", paste0("mortality_rate_cause_smoothed_reconciled", output_suffix_path)),
+  qc_dir  = qc_dir_path(paste0("reconcile_mortality_hierarchy", output_suffix_path)),
   
   years = 2018:2024,
   base_locations = 1:25,

@@ -1,0 +1,74 @@
+dataset_id: "death_110plus_summary"
+table_name: "death_110plus_summary"
+primary_key: ["year_id", "sex_id", "location_id"]
+
+required_columns:
+  year_id: "integer"
+  sex_id: "integer"
+  location_id: "integer"
+  death_count_110plus_observed: "integer"
+  has_death_110plus_observed: "logical"
+  source_dataset_version: "character"
+  source_run_id: "character"
+
+constraints:
+  year_id: {min: 2018, max: 2024, allow_na: false}
+  sex_id:
+    allowed_values: [8507, 8532]
+    allow_na: false
+  location_id:
+    allowed_values: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25]
+    allow_na: false
+  death_count_110plus_observed: {min: 0, allow_na: false}
+  has_death_110plus_observed:
+    allow_na: false
+  source_dataset_version:
+    allow_na: false
+  source_run_id:
+    allow_na: false
+
+policy:
+  age_definition: "Snapshot agregado contractual 110+: resume muertes observadas con age >= 110 ya armonizadas a la convencion 110+."
+  year_definition: "Ano calendario (year_id)."
+  population_units: "deaths"
+  location_definition: "00=Peru nacional agregado desde departamentos; 01-25=departamentos."
+  extrapolation:
+    method: "No aplica. Es un agregado observado y no sensible construido desde death_record_normalized."
+
+dictionary:
+  year_id:
+    label: "Ano calendario"
+    units: null
+    omop_domain_id: "observation"
+    is_omop_concept_id: false
+  sex_id:
+    label: "Sexo (concept id)"
+    units: null
+    allowed_values_label: "8507=Male; 8532=Female"
+    omop_domain_id: "person"
+    is_omop_concept_id: true
+  location_id:
+    label: "Ubicacion (0 nacional agregado; 1-25 departamento)"
+    units: null
+    omop_domain_id: "observation"
+    is_omop_concept_id: false
+  death_count_110plus_observed:
+    label: "Muertes observadas 110+"
+    units: "deaths"
+    omop_domain_id: "measurement"
+    is_omop_concept_id: false
+  has_death_110plus_observed:
+    label: "Presencia de muertes 110+"
+    units: null
+    omop_domain_id: "observation"
+    is_omop_concept_id: false
+  source_dataset_version:
+    label: "Version declarada del dataset fuente"
+    units: null
+    omop_domain_id: "metadata"
+    is_omop_concept_id: false
+  source_run_id:
+    label: "Run ID del dataset fuente"
+    units: null
+    omop_domain_id: "metadata"
+    is_omop_concept_id: false

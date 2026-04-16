@@ -1,0 +1,120 @@
+terms:
+  masa:
+    label: "Masa"
+    short_definition: "Suma de muertes dentro de un estrato analitico."
+    formula: "masa = sum(muertes)"
+    interpretation: "Si un metodo redistribuye o suaviza, la masa esperada debe preservarse en el estrato definido salvo que el paso sea explicitamente un ajuste por completitud."
+    columns: ["deaths_observed", "deaths_post_redistribution", "deaths_final", "deaths_smoothed"]
+    footnote: "Diferencias muy pequenas pueden deberse a precision numerica."
+  recalibracion:
+    label: "Recalibracion"
+    short_definition: "Escalamiento posterior a la prediccion inicial para que la suma del suavizado cierre con la masa observada del estrato."
+    formula: "factor = sum(observado) / sum(prediccion_inicial)"
+    interpretation: "La recalibracion puede preservar la suma por ano y sexo aunque cambie la forma por edad o region."
+    columns: ["recalibration_scope", "deaths_final", "deaths_smoothed"]
+    footnote: "En los outputs vigentes no se guardo la prediccion inicial completa; por eso el factor original solo estara disponible tras una corrida instrumentada."
+  prediccion_inicial:
+    label: "Prediccion inicial"
+    short_definition: "Valor predicho por el modelo antes de reescalar para preservar masa."
+    formula: "prediccion_inicial = predict(modelo, datos)"
+    interpretation: "Sirve para evaluar el ajuste crudo del modelo; si no esta persistida, no debe reconstruirse dentro del reporte."
+    columns: ["pred_deaths"]
+    footnote: "No inventar predicciones iniciales si no estan en outputs canonicos."
+  suavizado:
+    label: "Suavizado"
+    short_definition: "Serie final usada para tasas suavizadas despues del modelo o fallback y de la recalibracion cuando aplica."
+    formula: "deaths_smoothed = prediccion_inicial * factor_de_recalibracion"
+    interpretation: "Debe reducir ruido sin borrar patrones epidemiologicos plausibles."
+    columns: ["deaths_smoothed", "mortality_rate_smoothed"]
+    footnote: "Para fallback crudo, el suavizado puede coincidir con lo observado."
+  residuo_proxy:
+    label: "Residuo proxy"
+    short_definition: "Diferencia estandarizada simple entre observado y suavizado."
+    formula: "(observado - suavizado) / sqrt(suavizado + epsilon)"
+    interpretation: "Valores alrededor de cero indican buen alineamiento agregado; valores extremos sugieren revisar anos, edades o sexos especificos."
+    columns: ["observado", "suavizado", "residuo_proxy"]
+    footnote: "No reemplaza residuales formales del modelo mgcv."
+  roughness_temporal:
+    label: "Roughness temporal"
+    short_definition: "Medida de irregularidad temporal de la serie."
+    formula: "Depende del QC; usualmente resume cambios ano a ano o curvatura de la tendencia."
+    interpretation: "Valores altos pueden ser reales si hay shocks epidemiologicos, pero tambien pueden sugerir sobreajuste, baja frecuencia o inestabilidad."
+    columns: ["roughness", "roughness_flag", "qc_temporal_roughness"]
+    footnote: "Interpretar junto con frecuencia, pandemia y cambios de captura."
+  calibracion:
+    label: "Calibracion"
+    short_definition: "Comparacion grafica de observado vs suavizado."
+    formula: "punto = celda edad-sexo-ano o edad-sexo-ano-region"
+    interpretation: "La diagonal ideal indica observado igual a suavizado; una curva LOESS separada de la diagonal sugiere sesgo sistematico."
+    columns: ["observado", "suavizado"]
+    footnote: "Usar escala transformada cuando hay muchos ceros o extremos."
+  fallback:
+    label: "Fallback"
+    short_definition: "Metodo alternativo usado cuando el modelo estadistico principal no es confiable o no converge."
+    formula: "Depende del metodo E/F."
+    interpretation: "Debe evaluarse por trazabilidad, preservacion de masa y plausibilidad visual mas que por bondad de ajuste estadistica."
+    columns: ["fallback_level", "method_selected"]
+    footnote: "No es automaticamente malo; puede ser la opcion metodologicamente mas segura para datos escasos."
+  borrow_parent_shape:
+    label: "Borrow parent shape"
+    short_definition: "Heuristica que toma la forma temporal/edad del padre y la reescala para una causa hija con datos insuficientes."
+    formula: "hija_suavizada = forma_padre * factor_de_masa_hija"
+    interpretation: "Se usa cuando la causa hija no tiene suficiente informacion para estimar una forma propia robusta."
+    columns: ["borrowed_from_level", "borrowed_from_cause_concept_id"]
+    footnote: "Requiere revision de plausibilidad epidemiologica."
+  warning:
+    label: "Warning"
+    short_definition: "Mensaje de advertencia emitido por el ajuste o por un QC."
+    formula: ""
+    interpretation: "Un warning documentado puede ser aceptable; uno nuevo o no explicado debe revisarse."
+    columns: ["warning_flag", "warnings"]
+    footnote: "Distinguir warning tolerado de hard fail."
+  convergencia:
+    label: "Convergencia"
+    short_definition: "Estado que indica si el algoritmo de ajuste logro una solucion estable."
+    formula: ""
+    interpretation: "Sin convergencia confiable, el modelo puede ser descartado y pasar a otro metodo o fallback."
+    columns: ["convergence_status"]
+    footnote: "Revisar junto con intentos rechazados."
+  peso:
+    label: "Peso de redistribucion"
+    short_definition: "Proporcion usada para repartir muertes desde un origen garbage hacia destinos elegibles."
+    formula: "muertes_destino = muertes_origen * peso_destino"
+    interpretation: "Un peso alto significa que una mayor fraccion del origen se asigna a ese destino bajo la regla correspondiente."
+    columns: ["target_weight", "source_group_name", "target_cause_concept_id"]
+    footnote: "La suma de pesos debe interpretarse dentro de cada origen/regla."
+  garbage:
+    label: "Causa garbage"
+    short_definition: "Causa poco especifica o no util como causa final de carga que se redistribuye hacia causas destino validas."
+    formula: ""
+    interpretation: "No significa que la muerte sea invalida; significa que su causa registrada requiere reasignacion metodologica."
+    columns: ["source_group_name", "deaths_garbage_before"]
+    footnote: "El contrafactual de borrado aplica solo a muertes inicialmente garbage."
+  gap_before:
+    label: "Brecha antes"
+    short_definition: "Diferencia entre mortalidad esperada externa y mortalidad observada antes de correccion."
+    formula: "gap_before = expected_allcause - observed_allcause"
+    interpretation: "Positivo: observado menor que esperado. Negativo: observado mayor que esperado."
+    columns: ["gap_before", "expected_allcause", "observed_allcause"]
+    footnote: "Usar junto con poblacion, edad, sexo y region."
+  gap_after:
+    label: "Brecha despues"
+    short_definition: "Diferencia entre mortalidad esperada externa y mortalidad observada corregida."
+    formula: "gap_after = expected_allcause - observed_corrected_allcause"
+    interpretation: "Positivo: corregido queda menor que esperado. Negativo: corregido queda mayor que esperado."
+    columns: ["gap_after", "expected_allcause", "observed_corrected_allcause"]
+    footnote: "Una brecha residual puede ser metodologica si hubo clipping, truncamiento o backoff."
+  corrected_expected_ratio:
+    label: "Ratio corregido/esperado"
+    short_definition: "Relacion entre observado corregido y esperado externo."
+    formula: "observed_corrected_allcause / expected_allcause"
+    interpretation: "Menor que 1: corregido menor que esperado. Mayor que 1: corregido mayor que esperado."
+    columns: ["corrected_expected_ratio"]
+    footnote: "Valores cercanos a 1 indican cierre empirico con la tabla externa."
+  pandemic_excess:
+    label: "Exceso pandemico"
+    short_definition: "Componente de muertes all-cause corregidas que excede lo esperado en anos pandemicos."
+    formula: "pandemic_excess = max(0, observed_corrected_allcause - expected_allcause)"
+    interpretation: "Se calcula despues del factor de completitud; no debe leerse como masa SINADEF observada pura."
+    columns: ["pandemic_excess_allcause", "pandemic_excess_component"]
+    footnote: "Se reasigna segun reglas pandemicas para evitar doble conteo."

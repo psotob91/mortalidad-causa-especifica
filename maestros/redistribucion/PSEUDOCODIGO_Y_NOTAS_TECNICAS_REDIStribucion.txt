@@ -1,0 +1,198 @@
+PSEUDOCODIGO_Y_NOTAS_TECNICAS_REDIStribucion
+Version 1.0
+Uso: documento puente para traducir la logica de redistribucion en narrativa metodologica, tablas y analisis sin tener que reinterpretar el codigo desde cero.
+
+I. OBJETIVO DEL PROCESO
+
+El objetivo de la redistribucion es reasignar muertes codificadas a causas no validas o insuficientemente especificas hacia causas destino plausibles dentro de la lista de causas del estudio.
+El objetivo no es crear muertes nuevas.
+El objetivo no es eliminar muertes del analisis.
+El objetivo es mejorar la validez causal del calculo de muertes y AVP.
+
+II. ENTRADAS MINIMAS NECESARIAS
+
+1. Registro de defunciones con causa basica codificada.
+2. Identificador de edad, sexo, ano y territorio cuando corresponda.
+3. Lista de codigos o grupos definidos para redistribucion.
+4. Definicion de grupos de redistribucion.
+5. Universo de causas destino por grupo.
+6. Metodo asignado a cada grupo.
+7. Pesos, probabilidades o reglas de reasignacion.
+8. Tabla de correspondencia entre causas destino y lista causal del estudio.
+9. Tabla de AVP para combinar despues de la reasignacion.
+
+III. SECUENCIA CONCEPTUAL DEL PROCESO
+
+Paso 1. Identificar muertes candidatas a redistribucion.
+Revisar las muertes cuya causa basica cae en un codigo o grupo no aceptable para analisis de carga.
+
+Paso 2. Clasificar cada muerte en un grupo de redistribucion.
+Asignar la muerte al grupo que corresponda segun su codigo y la logica epidemiologica definida para ese conjunto.
+
+Paso 3. Definir el universo de causas destino.
+Para cada grupo, establecer a que causas puede redistribuirse.
+El universo puede ser amplio, restringido o parcial.
+
+Paso 4. Definir el metodo de redistribucion.
+Seleccionar para cada grupo uno de estos metodos:
+- evidencia directa
+- MCOD indirecto
+- redistribucion proporcional
+
+Paso 5. Construir pesos o reglas de reasignacion.
+Si el metodo produce probabilidades, construir una distribucion de pesos hacia causas destino.
+Si el metodo es una regla deterministica, identificar la o las causas destino y la proporcion asignada.
+
+Paso 6. Aplicar la reasignacion.
+Restar la muerte del grupo de redistribucion como causa final.
+Reasignar esa muerte en una o varias fracciones a las causas destino permitidas.
+
+Paso 7. Consolidar el resultado.
+Sumar todas las fracciones reasignadas por causa destino, edad, sexo, ano y geografia cuando corresponda.
+
+Paso 8. Verificar el cierre contable.
+Comprobar que la suma total de muertes antes y despues de la redistribucion se conserva.
+
+Paso 9. Recalcular AVP.
+Combinar las muertes reasignadas con la tabla de AVP para producir AVP despues de redistribucion.
+
+Paso 10. Generar salidas analiticas.
+Producir tablas de impacto total, impacto por grupo, impacto por causa destino, impacto por edad y sexo, y trazabilidad de casos ejemplares.
+
+IV. SEUDOCODIGO METODOLOGICO DETALLADO
+
+1. Tomar el universo de muertes elegibles para YLL.
+2. Separar las muertes con causas validas de las muertes con causas a redistribuir.
+3. Para cada muerte a redistribuir:
+   - identificar su grupo de redistribucion
+   - identificar su universo de causas destino
+   - identificar el metodo asignado
+   - recuperar el peso o la regla de reasignacion
+4. Si el metodo es evidencia directa:
+   - aplicar las probabilidades o reglas derivadas de la fuente directa
+5. Si el metodo es MCOD indirecto:
+   - aplicar la distribucion observada de causas basicas derivada del patron de causas asociadas
+6. Si el metodo es redistribucion proporcional:
+   - aplicar la distribucion observada de causas validas dentro del universo destino
+7. Repartir la muerte de manera total o parcial entre las causas destino.
+8. Repetir la reasignacion para todas las muertes del grupo.
+9. Repetir el proceso para todos los grupos.
+10. Consolidar las muertes finales por causa destino.
+11. Calcular el cambio antes y despues para cada causa y cada grupo de enfermedad.
+12. Calcular el cambio antes y despues en AVP.
+13. Documentar el aporte de cada grupo y de cada metodo al resultado final.
+
+V. DECISIONES EPIDEMIOLOGICAS QUE DEBEN QUEDAR EXPLICITAS
+
+1. Por que un codigo se considera no valido como causa basica final.
+2. Por que ciertos codigos se agrupan entre si.
+3. Por que el universo de causas destino es amplio, restringido o parcial.
+4. Por que un metodo se considera mas apropiado que otro.
+5. Si la reasignacion debe ser total o parcial.
+6. Si una regla especial responde a una causa prioritaria o a un patron local.
+7. Si una decision proviene de una metodologia fuente o de una adaptacion peruana.
+
+VI. ESTRUCTURAS MINIMAS DE DATOS
+
+1. Tabla de grupos de redistribucion
+Campos minimos:
+- grupo
+- codigos incluidos
+- metodo
+- universo destino
+
+2. Tabla de reglas o pesos
+Campos minimos:
+- grupo
+- causa destino
+- peso o regla
+- condicion de aplicacion
+
+3. Tabla de muertes antes de redistribucion
+Campos minimos:
+- causa
+- edad
+- sexo
+- ano
+- muertes
+
+4. Tabla de muertes redistribuidas
+Campos minimos:
+- grupo de redistribucion
+- causa destino
+- edad
+- sexo
+- ano
+- muertes reasignadas
+- metodo
+
+5. Tabla de muertes despues de redistribucion
+Campos minimos:
+- causa final
+- edad
+- sexo
+- ano
+- muertes
+
+6. Tabla de impacto en AVP
+Campos minimos:
+- causa
+- AVP antes
+- AVP despues
+- cambio
+
+VII. SALIDAS ANALITICAS INTERMEDIAS
+
+1. Conteo de muertes por grupo de redistribucion.
+2. Conteo de muertes por metodo.
+3. Conteo de muertes por causa destino.
+4. Pesos aplicados por grupo.
+5. Participacion relativa de cada grupo en el total redistribuido.
+6. Participacion relativa de cada metodo en el total redistribuido.
+7. Distribucion por edad y sexo de la redistribucion.
+
+VIII. SALIDAS ANALITICAS FINALES
+
+1. Muertes totales afectadas por redistribucion.
+2. AVP totales afectados por redistribucion.
+3. Cambios antes y despues por gran grupo de enfermedad.
+4. Causas destino con mayor ganancia de muertes.
+5. Causas destino con mayor ganancia de AVP.
+6. Caja explicativa de trazabilidad para una causa ejemplar.
+7. Analisis de sensibilidad cuando exista.
+
+IX. VERIFICACIONES OBLIGATORIAS
+
+1. La suma total de muertes debe preservarse.
+2. Ninguna muerte debe quedar fuera de la lista causal final por un error de redistribucion.
+3. Los universos de causas destino deben respetar la logica epidemiologica definida.
+4. Los pesos deben ser coherentes con la regla aplicada.
+5. La redistribucion no debe asignar muertes a causas imposibles segun la restriccion definida.
+6. El cambio en AVP debe ser interpretable a la luz del cambio en muertes y edad al morir.
+
+X. ADVERTENCIAS METODOLOGICAS
+
+1. Una redistribucion mas completa no implica automaticamente una redistribucion mas valida.
+2. El metodo proporcional es util pero menos especifico.
+3. Las multiples causas pueden reflejar practicas de certificacion y no solo procesos biologicos.
+4. Las fuentes directas pueden tener alta especificidad pero cobertura limitada.
+5. Un cambio pequeno en muertes puede traducirse en un cambio mayor en AVP si se concentra en edades tempranas.
+
+XI. PUNTOS QUE EL REDACTOR DEBE TRANSFORMAR EN NARRATIVA
+
+1. Definicion del problema de redistribucion.
+2. Criterios de inclusion de codigos y grupos.
+3. Jerarquia entre metodos.
+4. Justificacion del metodo por grupo.
+5. Magnitud total del problema.
+6. Composicion por grupos.
+7. Impacto global en muertes y AVP.
+8. Impacto por grupo de enfermedad.
+9. Cambios metodologicos relevantes.
+10. Limitaciones e implicancias.
+
+XII. REGLA FINAL DE REDACCION
+
+La narrativa metodologica final no debe obligar al lector a inferir el mecanismo.
+La narrativa final debe mostrar el camino desde el codigo redistribuido hasta la causa final.
+La narrativa final debe dejar claro que parte del resultado depende de evidencia mas especifica y que parte depende de una regla mas general.

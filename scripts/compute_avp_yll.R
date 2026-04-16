@@ -41,12 +41,17 @@ source(here("R", "io_utils.R"))
 source(here("R", "catalog_utils.R"))
 source(here("R", "spec_utils.R"))
 
+mortality_input_override <- Sys.getenv("AVP_INPUT_MORTALITY_PATH", unset = "")
+output_suffix <- Sys.getenv("AVP_OUTPUT_SUFFIX", unset = "")
+output_suffix_path <- if (nzchar(output_suffix)) paste0("_", output_suffix) else ""
+
 CFG <- list(
   version = "v0.3.0_avp_reconciled_final",
   dataset_id = "avp_yll_cause_reconciled",
   table_name = "avp_yll_cause_reconciled",
   
   input_mortality_candidates = c(
+    if (nzchar(mortality_input_override)) mortality_input_override,
     here("data", "final", "mortality_rate_cause_smoothed_reconciled", "mortality_rate_cause_smoothed_reconciled.parquet"),
     here("data", "final", "mortality_rate_cause_smoothed_reconciled", "mortality_rate_cause_smoothed_reconciled.csv")
   ),
@@ -58,8 +63,8 @@ CFG <- list(
   
   external_yaml_path = here("config", "external_sources.yml"),
   
-  out_dir = here("data", "final", "avp_yll_cause_reconciled"),
-  qc_dir  = qc_dir_path("compute_avp_yll"),
+  out_dir = here("data", "final", paste0("avp_yll_cause_reconciled", output_suffix_path)),
+  qc_dir  = qc_dir_path(paste0("compute_avp_yll", output_suffix_path)),
   
   years = 2018:2024,
   base_locations = 1:25,
@@ -76,6 +81,8 @@ CFG <- list(
   rate_multiplier = 100000,
   max_avp_rate_warn_per_100k = 100000,
   max_avp_rate_hard_per_100k = 500000,
+  min_population_for_rate_qc = 25,
+  max_age_for_rate_qc = 100L,
   top_n_extremes = 200L,
   
   geo_abs_tol = 1e-8,
@@ -617,15 +624,34 @@ tryCatch({
     year_id, location_id, sex_id, age, cause_concept_id
   )][N > 1]
   
-  qc_rate_plausibility <- out[, .(
+  plausibility_scope <- out[
+    population >= CFG$min_population_for_rate_qc &
+      age <= CFG$max_age_for_rate_qc
+  ]
+  qc_rate_plausibility <- plausibility_scope[, .(
     n_rows = .N,
     max_avp_rate = suppressWarnings(max(avp_rate, na.rm = TRUE)),
     max_yll_rate = suppressWarnings(max(yll_rate, na.rm = TRUE)),
     p99_avp_rate = suppressWarnings(quantile(avp_rate, 0.99, na.rm = TRUE)),
     p999_avp_rate = suppressWarnings(quantile(avp_rate, 0.999, na.rm = TRUE))
   )]
+  qc_rate_plausibility_scope <- data.table(
+    n_rows_full = nrow(out),
+    n_rows_plausibility_scope = nrow(plausibility_scope),
+    min_population_for_rate_qc = CFG$min_population_for_rate_qc,
+    max_age_for_rate_qc = CFG$max_age_for_rate_qc
+  )
   
   qc_top_avp_rate_cells <- out[
+    order(-avp_rate)
+  ][1:min(.N, CFG$top_n_extremes),
+    .(
+      year_id, location_id, sex_id, age,
+      cause_concept_id, cause_level,
+      population, deaths_final, deaths_smoothed_consistent,
+      ex_standard, avp_abs, avp_rate
+    )]
+  qc_top_avp_rate_cells_plausibility_scope <- plausibility_scope[
     order(-avp_rate)
   ][1:min(.N, CFG$top_n_extremes),
     .(
@@ -737,7 +763,9 @@ tryCatch({
   qc_year_sex_path <- file.path(CFG$qc_dir, "qc_year_sex.csv")
   qc_duplicate_pk_path <- file.path(CFG$qc_dir, "qc_duplicate_pk.csv")
   qc_rate_plausibility_path <- file.path(CFG$qc_dir, "qc_rate_plausibility.csv")
+  qc_rate_plausibility_scope_path <- file.path(CFG$qc_dir, "qc_rate_plausibility_scope.csv")
   qc_top_avp_rate_cells_path <- file.path(CFG$qc_dir, "qc_top_avp_rate_cells.csv")
+  qc_top_avp_rate_cells_plausibility_scope_path <- file.path(CFG$qc_dir, "qc_top_avp_rate_cells_plausibility_scope.csv")
   qc_top_avp_abs_cells_path <- file.path(CFG$qc_dir, "qc_top_avp_abs_cells.csv")
   qc_ratio_avp_vs_deaths_path <- file.path(CFG$qc_dir, "qc_ratio_avp_vs_deaths.csv")
   qc_standard_table_summary_path <- file.path(CFG$qc_dir, "qc_standard_table_summary.csv")
@@ -756,7 +784,9 @@ tryCatch({
   fwrite(qc_year_sex, qc_year_sex_path)
   fwrite(qc_duplicate_pk, qc_duplicate_pk_path)
   fwrite(qc_rate_plausibility, qc_rate_plausibility_path)
+  fwrite(qc_rate_plausibility_scope, qc_rate_plausibility_scope_path)
   fwrite(qc_top_avp_rate_cells, qc_top_avp_rate_cells_path)
+  fwrite(qc_top_avp_rate_cells_plausibility_scope, qc_top_avp_rate_cells_plausibility_scope_path)
   fwrite(qc_top_avp_abs_cells, qc_top_avp_abs_cells_path)
   fwrite(qc_ratio_avp_vs_deaths, qc_ratio_avp_vs_deaths_path)
   fwrite(qc_standard_table_summary, qc_standard_table_summary_path)
@@ -896,7 +926,9 @@ tryCatch({
     qc_year_sex_path,
     qc_duplicate_pk_path,
     qc_rate_plausibility_path,
+    qc_rate_plausibility_scope_path,
     qc_top_avp_rate_cells_path,
+    qc_top_avp_rate_cells_plausibility_scope_path,
     qc_top_avp_abs_cells_path,
     qc_ratio_avp_vs_deaths_path,
     qc_standard_table_summary_path,

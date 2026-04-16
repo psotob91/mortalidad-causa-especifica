@@ -25,6 +25,11 @@
 #       * mortality_data_sufficiency_audit
 #       * mortality_model_attempt_log
 #       * mortality_model_registry
+#       * mortality_model_coefficients
+#       * mortality_model_smooth_terms
+#       * mortality_model_fit_metrics
+#       * mortality_model_recalibration_factors
+#       * mortality_model_heuristic_values
 #
 # Fallbacks:
 #   A: sex + pandemic_phase + s(age) + s(age, by=sex_male) + s(year) + re(region)
@@ -86,6 +91,7 @@ debug_years <- parse_int_vec_env("MORTALITY_DEBUG_YEARS", 2018:2024)
 debug_cause_limit <- parse_int_env("MORTALITY_DEBUG_CAUSE_LIMIT", 0L)
 output_suffix <- Sys.getenv("MORTALITY_OUTPUT_SUFFIX", unset = "")
 output_suffix_path <- if (nzchar(output_suffix)) paste0("_", output_suffix) else ""
+death_input_override <- Sys.getenv("MORTALITY_INPUT_DEATH_PATH", unset = "")
 
 CFG <- list(
   version = "v0.4.1_terminal_audited_pandemic_window_guardrails",
@@ -100,6 +106,7 @@ CFG <- list(
   rate_multiplier = 100000,
   
   input_death_candidates = c(
+    if (nzchar(death_input_override)) death_input_override,
     here("data", "final", "death_cause_final_hierarchical", "death_cause_final_hierarchical.parquet"),
     here("data", "final", "death_cause_final_hierarchical", "death_cause_final_hierarchical.csv")
   ),
@@ -152,6 +159,10 @@ CFG <- list(
   # guardarraíles numéricos
   max_rate_per_100k = 50000,
   max_ratio_pred_vs_obs_plus1 = 100,
+  validation_holdout_years = c(2022L, 2024L),
+  validation_min_train_years = 4L,
+  validation_min_holdout_deaths = 1e-8,
+  validation_min_improvement = 0.05,
 
   
   debug_cause_limit = debug_cause_limit,
@@ -283,6 +294,124 @@ recalibrate_within_strata <- function(dt, pred_col, obs_col,
   )]
   
   x[]
+}
+
+extract_model_diagnostics <- function(fit, cause_concept_id, cause_name,
+                                      method_code, attempt_order,
+                                      formula_text, rows_train, rows_pred,
+                                      warning_text, convergence_status,
+                                      run_id) {
+  if (is.null(fit) || inherits(fit, "fit_error")) {
+    empty_coef <- data.table()
+    empty_smooth <- data.table()
+    empty_metrics <- data.table()
+    return(list(coefficients = empty_coef, smooth_terms = empty_smooth, fit_metrics = empty_metrics, summary_text = character()))
+  }
+  sm <- tryCatch(summary(fit), error = function(e) NULL)
+  summary_text <- tryCatch(capture.output(print(sm)), error = function(e) paste("No se pudo capturar summary():", conditionMessage(e)))
+  ptab <- if (!is.null(sm) && !is.null(sm$p.table)) as.data.table(sm$p.table, keep.rownames = "term") else data.table()
+  if (nrow(ptab)) {
+    setnames(ptab, make.names(names(ptab), unique = TRUE))
+    ptab[, `:=`(
+      cause_concept_id = cause_concept_id,
+      cause_name = cause_name,
+      method_code = method_code,
+      attempt_order = attempt_order,
+      formula = formula_text,
+      run_id = run_id
+    )]
+    setcolorder(ptab, c("cause_concept_id", "cause_name", "method_code", "attempt_order", "term", setdiff(names(ptab), c("cause_concept_id", "cause_name", "method_code", "attempt_order", "term"))))
+  }
+  stab <- if (!is.null(sm) && !is.null(sm$s.table)) as.data.table(sm$s.table, keep.rownames = "smooth_term") else data.table()
+  if (nrow(stab)) {
+    setnames(stab, make.names(names(stab), unique = TRUE))
+    stab[, `:=`(
+      cause_concept_id = cause_concept_id,
+      cause_name = cause_name,
+      method_code = method_code,
+      attempt_order = attempt_order,
+      formula = formula_text,
+      run_id = run_id
+    )]
+    setcolorder(stab, c("cause_concept_id", "cause_name", "method_code", "attempt_order", "smooth_term", setdiff(names(stab), c("cause_concept_id", "cause_name", "method_code", "attempt_order", "smooth_term"))))
+  }
+  metrics <- data.table(
+    cause_concept_id = cause_concept_id,
+    cause_name = cause_name,
+    method_code = method_code,
+    attempt_order = attempt_order,
+    formula = formula_text,
+    aic = suppressWarnings(tryCatch(AIC(fit), error = function(e) NA_real_)),
+    deviance = suppressWarnings(tryCatch(stats::deviance(fit), error = function(e) NA_real_)),
+    null_deviance = suppressWarnings(tryCatch(fit$null.deviance %||% NA_real_, error = function(e) NA_real_)),
+    deviance_explained = suppressWarnings(tryCatch(sm$dev.expl %||% NA_real_, error = function(e) NA_real_)),
+    df_residual = suppressWarnings(tryCatch(stats::df.residual(fit), error = function(e) NA_real_)),
+    n_observations = suppressWarnings(tryCatch(stats::nobs(fit), error = function(e) rows_train)),
+    rows_train = as.integer(rows_train),
+    rows_pred = as.integer(rows_pred),
+    family = suppressWarnings(tryCatch(fit$family$family %||% NA_character_, error = function(e) NA_character_)),
+    link = suppressWarnings(tryCatch(fit$family$link %||% NA_character_, error = function(e) NA_character_)),
+    convergence_status = convergence_status,
+    warning_flag = nzchar(warning_text %||% ""),
+    warnings = if (nzchar(warning_text %||% "")) warning_text else NA_character_,
+    run_id = run_id
+  )
+  list(coefficients = ptab, smooth_terms = stab, fit_metrics = metrics, summary_text = summary_text)
+}
+
+recalibration_factor_audit <- function(tmp, cause_concept_id, cause_name,
+                                       method_code, attempt_order,
+                                       formula_text, run_id,
+                                       by_cols = c("year_id", "sex_id")) {
+  if (!all(c("pred_deaths", "pred_recal", "deaths_final") %in% names(tmp))) return(data.table())
+  out <- tmp[, .(
+    observed_mass = sum(deaths_final, na.rm = TRUE),
+    initial_prediction_mass = sum(pred_deaths, na.rm = TRUE),
+    smoothed_final_mass = sum(pred_recal, na.rm = TRUE)
+  ), by = by_cols]
+  out[, `:=`(
+    cause_concept_id = cause_concept_id,
+    cause_name = cause_name,
+    method_code = method_code,
+    attempt_order = attempt_order,
+    formula = formula_text,
+    recalibration_factor = fifelse(
+      is.finite(initial_prediction_mass) & initial_prediction_mass > 0,
+      observed_mass / initial_prediction_mass,
+      NA_real_
+    ),
+    final_mass_diff = smoothed_final_mass - observed_mass,
+    run_id = run_id
+  )]
+  setcolorder(out, c("cause_concept_id", "cause_name", "method_code", "attempt_order", by_cols, setdiff(names(out), c("cause_concept_id", "cause_name", "method_code", "attempt_order", by_cols))))
+  out[]
+}
+
+heuristic_value_audit <- function(base_dt, result_dt, cause_concept_id, cause_name,
+                                  method_code, attempt_order, formula_text,
+                                  borrowed_from_cause = NA_integer_,
+                                  borrowed_from_level = NA_integer_,
+                                  rationale = NA_character_,
+                                  run_id) {
+  data.table(
+    cause_concept_id = cause_concept_id,
+    cause_name = cause_name,
+    method_code = method_code,
+    attempt_order = attempt_order,
+    heuristic_rule = formula_text,
+    borrowed_from_cause = borrowed_from_cause,
+    borrowed_from_level = borrowed_from_level,
+    mass_input = sum(base_dt$deaths_final, na.rm = TRUE),
+    mass_output = if (!is.null(result_dt)) sum(result_dt$deaths_smoothed, na.rm = TRUE) else NA_real_,
+    max_abs_year_sex_diff = if (!is.null(result_dt)) {
+      chk <- result_dt[, .(obs = sum(deaths_final, na.rm = TRUE), pred = sum(deaths_smoothed, na.rm = TRUE)), by = .(year_id, sex_id)]
+      max(abs(chk$pred - chk$obs), na.rm = TRUE)
+    } else {
+      NA_real_
+    },
+    rationale = rationale,
+    run_id = run_id
+  )
 }
 
 classify_data_category <- function(total_deaths, mean_deaths_per_year,
@@ -453,6 +582,53 @@ fit_model_D <- function(train_dt) {
   mgcv::bam(
     deaths_final ~
       sex_f +
+      period_f +
+      age_band_f +
+      s(location_id, bs = "re") +
+      offset(log(population)),
+    data = train_dt,
+    family = poisson(link = "log"),
+    method = "fREML",
+    discrete = TRUE,
+    nthreads = CFG$bam_nthreads
+  )
+}
+
+fit_model_A_NS <- function(train_dt) {
+  mgcv::bam(
+    deaths_final ~
+      pandemic_phase_f +
+      s(age, k = CFG$age_k_main, bs = "cr") +
+      s(year_id, k = CFG$year_k, bs = "cr") +
+      s(location_id, bs = "re") +
+      offset(log(population)),
+    data = train_dt,
+    family = poisson(link = "log"),
+    method = "fREML",
+    discrete = TRUE,
+    nthreads = CFG$bam_nthreads
+  )
+}
+
+fit_model_C_NS <- function(train_dt) {
+  mgcv::bam(
+    deaths_final ~
+      pandemic_phase_f +
+      age_band_f +
+      s(year_id, k = CFG$year_k, bs = "cr") +
+      s(location_id, bs = "re") +
+      offset(log(population)),
+    data = train_dt,
+    family = poisson(link = "log"),
+    method = "fREML",
+    discrete = TRUE,
+    nthreads = CFG$bam_nthreads
+  )
+}
+
+fit_model_D_NS <- function(train_dt) {
+  mgcv::bam(
+    deaths_final ~
       period_f +
       age_band_f +
       s(location_id, bs = "re") +
@@ -686,9 +862,295 @@ capture_fit_with_warnings <- function(expr) {
   list(value = value, warnings = unique(warnings))
 }
 
-try_fit_path <- function(path_code, base_dt, audit_row, parent_result = NULL) {
+classify_model_warnings <- function(warnings) {
+  txt <- paste(unique(na.omit(as.character(warnings))), collapse = " | ")
+  if (!nzchar(txt)) return(list(severity = "none", is_critical = FALSE, note = "sin warnings"))
+  low <- tolower(txt)
+  non_integer_only <- grepl("non-integer x", low) &&
+    !grepl("converg|invalid|nonfinite|singular|rank|not defined|error|numerically 0", low)
+  if (non_integer_only) {
+    return(list(
+      severity = "expected_fractional_counts",
+      is_critical = FALSE,
+      note = "warning esperado: muertes fraccionales tras redistribucion/correccion"
+    ))
+  }
+  critical <- grepl("converg|invalid|nonfinite|singular|rank|not defined|contrasts not defined|prediction_invalid|numerically 0", low)
+  list(
+    severity = if (critical) "warning_critico" else "warning_no_bloqueante",
+    is_critical = critical,
+    note = if (critical) "warning potencialmente critico para seleccion de modelo" else "warning no bloqueante documentado"
+  )
+}
+
+poisson_deviance_score <- function(obs, pred) {
+  obs <- as.numeric(obs)
+  pred <- pmax(as.numeric(pred), 1e-12)
+  keep <- is.finite(obs) & is.finite(pred) & obs >= 0
+  if (!any(keep)) return(NA_real_)
+  obs <- obs[keep]
+  pred <- pred[keep]
+  term <- fifelse(obs > 0, obs * log(obs / pred) - (obs - pred), pred)
+  2 * sum(term, na.rm = TRUE)
+}
+
+summarise_candidate_validation <- function(base_dt, pred, path_code, warnings, failure_reason = NA_character_,
+                                           validation_strategy = "temporal_holdout") {
+  if (!is_valid_fit_vector(pred, nrow(base_dt))) {
+    return(data.table(
+      method_code = path_code, validation_strategy = validation_strategy,
+      validation_status = "failed", validation_failure_reason = failure_reason %||% "prediction_invalid",
+      validation_deviance = NA_real_, validation_mae = NA_real_, validation_rmse = NA_real_,
+      validation_bias = NA_real_, holdout_deaths = sum(base_dt$deaths_final, na.rm = TRUE),
+      warning_severity = classify_model_warnings(warnings)$severity,
+      warning_is_critical = classify_model_warnings(warnings)$is_critical
+    ))
+  }
+  obs <- base_dt$deaths_final
+  diff <- pred - obs
+  warn <- classify_model_warnings(warnings)
+  data.table(
+    method_code = path_code,
+    validation_strategy = validation_strategy,
+    validation_status = "ok",
+    validation_failure_reason = NA_character_,
+    validation_deviance = poisson_deviance_score(obs, pred),
+    validation_mae = mean(abs(diff), na.rm = TRUE),
+    validation_rmse = sqrt(mean(diff^2, na.rm = TRUE)),
+    validation_bias = sum(diff, na.rm = TRUE),
+    holdout_deaths = sum(obs, na.rm = TRUE),
+    warning_severity = warn$severity,
+    warning_is_critical = warn$is_critical
+  )
+}
+
+fit_predict_for_validation <- function(path_code, train_dt, holdout_dt) {
+  if (path_code == "A") {
+    cap <- capture_fit_with_warnings(fit_model_A(train_dt))
+    if (inherits(cap$value, "fit_error")) return(list(pred = NULL, warnings = cap$warnings, failure = cap$value$error))
+    return(list(pred = safe_predict_response(cap$value, holdout_dt), warnings = cap$warnings, failure = NA_character_))
+  }
+  if (path_code == "B") {
+    cap <- capture_fit_with_warnings(fit_model_B(train_dt))
+    if (inherits(cap$value, "fit_error")) return(list(pred = NULL, warnings = cap$warnings, failure = cap$value$error))
+    return(list(pred = safe_predict_response(cap$value, holdout_dt), warnings = cap$warnings, failure = NA_character_))
+  }
+  if (path_code == "C") {
+    cap <- capture_fit_with_warnings(fit_model_C(aggregate_for_age_band(train_dt)))
+    if (inherits(cap$value, "fit_error")) return(list(pred = NULL, warnings = cap$warnings, failure = cap$value$error))
+    return(list(pred = safe_predict_response(cap$value, holdout_dt), warnings = cap$warnings, failure = NA_character_))
+  }
+  if (path_code == "D") {
+    cap <- capture_fit_with_warnings(fit_model_D(aggregate_for_age_band_period(train_dt)))
+    if (inherits(cap$value, "fit_error")) return(list(pred = NULL, warnings = cap$warnings, failure = cap$value$error))
+    return(list(pred = safe_predict_response(cap$value, holdout_dt), warnings = cap$warnings, failure = NA_character_))
+  }
+  if (path_code == "A_NS") {
+    cap <- capture_fit_with_warnings(fit_model_A_NS(train_dt))
+    if (inherits(cap$value, "fit_error")) return(list(pred = NULL, warnings = cap$warnings, failure = cap$value$error))
+    return(list(pred = safe_predict_response(cap$value, holdout_dt), warnings = cap$warnings, failure = NA_character_))
+  }
+  if (path_code == "C_NS") {
+    cap <- capture_fit_with_warnings(fit_model_C_NS(aggregate_for_age_band(train_dt)))
+    if (inherits(cap$value, "fit_error")) return(list(pred = NULL, warnings = cap$warnings, failure = cap$value$error))
+    return(list(pred = safe_predict_response(cap$value, holdout_dt), warnings = cap$warnings, failure = NA_character_))
+  }
+  if (path_code == "D_NS") {
+    cap <- capture_fit_with_warnings(fit_model_D_NS(aggregate_for_age_band_period(train_dt)))
+    if (inherits(cap$value, "fit_error")) return(list(pred = NULL, warnings = cap$warnings, failure = cap$value$error))
+    return(list(pred = safe_predict_response(cap$value, holdout_dt), warnings = cap$warnings, failure = NA_character_))
+  }
+  if (path_code %in% c("E", "F")) {
+    return(list(pred = NULL, warnings = character(), failure = "fallback_not_competed_in_holdout"))
+  }
+  list(pred = NULL, warnings = character(), failure = "unknown_path")
+}
+
+candidate_paths_for_competition <- function(paths) {
+  out <- unique(paths)
+  if ("A" %in% out) out <- c(out, "A_NS")
+  if ("C" %in% out) out <- c(out, "C_NS")
+  if ("D" %in% out) out <- c(out, "D_NS")
+  unique(out)
+}
+
+validate_candidate_paths <- function(base_dt, paths) {
+  holdout_years <- intersect(CFG$validation_holdout_years, unique(base_dt$year_id))
+  train_dt <- base_dt[!(year_id %in% holdout_years)]
+  holdout_dt <- base_dt[year_id %in% holdout_years]
+  if (uniqueN(train_dt$year_id) < CFG$validation_min_train_years ||
+      nrow(holdout_dt) == 0L ||
+      sum(holdout_dt$deaths_final, na.rm = TRUE) <= CFG$validation_min_holdout_deaths) {
+    holdout_years <- max(unique(base_dt$year_id), na.rm = TRUE)
+    train_dt <- base_dt[year_id != holdout_years]
+    holdout_dt <- base_dt[year_id == holdout_years]
+  }
+  strategy <- paste0("temporal_holdout_years_", paste(sort(unique(holdout_dt$year_id)), collapse = "_"))
+  if (uniqueN(train_dt$year_id) < CFG$validation_min_train_years || nrow(holdout_dt) == 0L) {
+    return(data.table(
+      method_code = paths,
+      validation_strategy = "insufficient_holdout",
+      validation_status = "not_run",
+      validation_failure_reason = "insufficient_temporal_support",
+      validation_deviance = NA_real_, validation_mae = NA_real_, validation_rmse = NA_real_,
+      validation_bias = NA_real_, holdout_deaths = sum(holdout_dt$deaths_final, na.rm = TRUE),
+      warning_severity = "not_evaluated", warning_is_critical = FALSE
+    ))
+  }
+  rbindlist(lapply(paths, function(path_code) {
+    fp <- fit_predict_for_validation(path_code, train_dt, holdout_dt)
+    summarise_candidate_validation(holdout_dt, fp$pred, path_code, fp$warnings, fp$failure, strategy)
+  }), use.names = TRUE, fill = TRUE)
+}
+
+choose_competition_winner <- function(validation_dt, path_order) {
+  ok <- validation_dt[
+    validation_status == "ok" &
+      is.finite(validation_deviance) &
+      warning_is_critical == FALSE
+  ][order(validation_deviance, validation_mae, match(method_code, path_order))]
+  if (nrow(ok) == 0L) {
+    return(list(method_code = NA_character_, reason = "sin_candidato_validado_no_critico"))
+  }
+  legacy <- path_order[1]
+  legacy_row <- ok[method_code == legacy][1]
+  best <- ok[1]
+  if (nrow(legacy_row) == 1L && is.finite(legacy_row$validation_deviance) &&
+      is.finite(best$validation_deviance)) {
+    improvement <- (legacy_row$validation_deviance - best$validation_deviance) / legacy_row$validation_deviance
+    if (best$method_code != legacy && improvement < CFG$validation_min_improvement) {
+      return(list(method_code = legacy, reason = sprintf("conserva_legacy_mejora_%.3f_menor_umbral", improvement)))
+    }
+  }
+  list(method_code = best$method_code, reason = "mejor_validacion_temporal_no_critica")
+}
+
+prediction_diagnostics_audit <- function(tmp, cause_concept_id, cause_name,
+                                         method_code, attempt_order, formula_text,
+                                         run_id, by_cols) {
+  if (!all(c("pred_deaths", "pred_recal", "deaths_final") %in% names(tmp))) return(data.table())
+  out <- tmp[, .(
+    observed = sum(deaths_final, na.rm = TRUE),
+    pred_initial = sum(pred_deaths, na.rm = TRUE),
+    pred_recalibrated = sum(pred_recal, na.rm = TRUE)
+  ), by = by_cols]
+  out[, `:=`(
+    cause_concept_id = cause_concept_id,
+    cause_name = cause_name,
+    method_code = method_code,
+    attempt_order = attempt_order,
+    formula = formula_text,
+    recalibration_factor = fifelse(is.finite(pred_initial) & pred_initial > 0, observed / pred_initial, NA_real_),
+    diff_initial = pred_initial - observed,
+    diff_recalibrated = pred_recalibrated - observed,
+    resid_proxy_initial = (observed - pred_initial) / sqrt(pmax(pred_initial, 0) + 1e-6),
+    resid_proxy_recalibrated = (observed - pred_recalibrated) / sqrt(pmax(pred_recalibrated, 0) + 1e-6),
+    run_id = run_id
+  )]
+  setcolorder(out, c("cause_concept_id", "cause_name", "method_code", "attempt_order", by_cols, setdiff(names(out), c("cause_concept_id", "cause_name", "method_code", "attempt_order", by_cols))))
+  out[]
+}
+
+try_fit_path <- function(path_code, base_dt, audit_row, parent_result = NULL,
+                         attempt_order = NA_integer_) {
   warn_text <- character()
   conv_status <- "ok"
+  cid <- unique(base_dt$cause_concept_id)[1]
+  cname <- unique(base_dt$cause_name)[1]
+
+  if (path_code %in% c("A_NS", "C_NS", "D_NS")) {
+    if (path_code == "A_NS") {
+      fit_cap <- capture_fit_with_warnings(fit_model_A_NS(base_dt))
+      formula_text <- "pandemic_phase + s(age) + s(year) + re(region) + offset(log(pop))"
+      aggregation_age <- "single_age"
+      aggregation_year <- "single_year"
+      aggregation_region <- "department_partial_pooling"
+      rows_train <- nrow(base_dt)
+    } else if (path_code == "C_NS") {
+      train_ns <- aggregate_for_age_band(base_dt)
+      fit_cap <- capture_fit_with_warnings(fit_model_C_NS(train_ns))
+      formula_text <- "pandemic_phase + age_band + s(year) + re(region) + offset(log(pop))"
+      aggregation_age <- "age_band_protocol"
+      aggregation_year <- "single_year"
+      aggregation_region <- "department_partial_pooling"
+      rows_train <- nrow(train_ns)
+    } else {
+      train_ns <- aggregate_for_age_band_period(base_dt)
+      fit_cap <- capture_fit_with_warnings(fit_model_D_NS(train_ns))
+      formula_text <- "period + age_band + re(region) + offset(log(pop))"
+      aggregation_age <- "age_band_protocol"
+      aggregation_year <- "period_2018_2019__2020_2021__2022_2024"
+      aggregation_region <- "department_partial_pooling"
+      rows_train <- nrow(train_ns)
+    }
+    warn_text <- fit_cap$warnings
+    if (inherits(fit_cap$value, "fit_error")) {
+      return(list(result = NULL, convergence_status = "error", warnings = warn_text,
+                  failure_reason = fit_cap$value$error,
+                  formula = formula_text,
+                  aggregation_age = aggregation_age,
+                  aggregation_year = aggregation_year,
+                  aggregation_region = aggregation_region,
+                  rows_train = rows_train))
+    }
+    fit <- fit_cap$value
+    pred <- safe_predict_response(fit, base_dt)
+    if (!is_valid_fit_vector(pred, nrow(base_dt))) {
+      return(list(result = NULL, convergence_status = "invalid_prediction", warnings = warn_text,
+                  failure_reason = "prediction_invalid",
+                  formula = formula_text,
+                  aggregation_age = aggregation_age,
+                  aggregation_year = aggregation_year,
+                  aggregation_region = aggregation_region,
+                  rows_train = rows_train))
+    }
+    tmp <- copy(base_dt)
+    tmp[, pred_deaths := pred]
+    tmp <- recalibrate_within_strata(tmp, "pred_deaths", "deaths_final", by_cols = c("year_id", "sex_id"))
+    res <- make_result_dt(
+      base_dt = base_dt,
+      deaths_smoothed = tmp$pred_recal,
+      method_code = path_code,
+      model_formula_used = formula_text,
+      training_age_scale = aggregation_age,
+      training_time_scale = aggregation_year,
+      aggregation_age = aggregation_age,
+      aggregation_year = aggregation_year,
+      aggregation_region = aggregation_region,
+      model_status = "ok",
+      convergence_status = ifelse(length(warn_text) > 0L, "warning", "ok"),
+      warning_flag = length(warn_text) > 0L,
+      data_category = audit_row$data_category[1],
+      rows_available = audit_row$rows_available[1],
+      rows_expected = audit_row$rows_expected[1],
+      data_density = audit_row$data_density[1],
+      years_with_deaths = audit_row$years_with_deaths[1],
+      regions_with_deaths = audit_row$regions_with_deaths[1]
+    )
+    diag <- extract_model_diagnostics(
+      fit, cid, cname, path_code, attempt_order, formula_text,
+      rows_train = rows_train, rows_pred = nrow(base_dt),
+      warning_text = paste(unique(warn_text), collapse = " | "),
+      convergence_status = ifelse(length(warn_text) > 0L, "warning", "ok"),
+      run_id = run_id
+    )
+    recal <- recalibration_factor_audit(tmp, cid, cname, path_code, attempt_order, formula_text, run_id)
+    return(list(result = res, convergence_status = ifelse(length(warn_text) > 0L, "warning", "ok"),
+                warnings = warn_text, failure_reason = NA_character_,
+                formula = formula_text,
+                aggregation_age = aggregation_age,
+                aggregation_year = aggregation_year,
+                aggregation_region = aggregation_region,
+                rows_train = rows_train,
+                coefficients = diag$coefficients,
+                smooth_terms = diag$smooth_terms,
+                fit_metrics = diag$fit_metrics,
+                recalibration_factors = recal,
+                heuristic_values = data.table(),
+                model_summary_text = diag$summary_text,
+                prediction_diag_year_sex = prediction_diagnostics_audit(tmp, cid, cname, path_code, attempt_order, formula_text, run_id, c("year_id", "sex_id")),
+                prediction_diag_age_year_sex = prediction_diagnostics_audit(tmp, cid, cname, path_code, attempt_order, formula_text, run_id, c("year_id", "sex_id", "age"))))
+  }
   
   if (path_code == "A") {
     fit_cap <- capture_fit_with_warnings(fit_model_A(base_dt))
@@ -739,13 +1201,30 @@ try_fit_path <- function(path_code, base_dt, audit_row, parent_result = NULL) {
       regions_with_deaths = audit_row$regions_with_deaths[1]
     )
     
+    formula_text <- "sex + pandemic_phase + s(age) + s(age,by=sex_male) + s(year) + re(region) + offset(log(pop))"
+    diag <- extract_model_diagnostics(
+      fit, cid, cname, "A", attempt_order, formula_text,
+      rows_train = nrow(base_dt), rows_pred = nrow(base_dt),
+      warning_text = paste(unique(warn_text), collapse = " | "),
+      convergence_status = ifelse(length(warn_text) > 0L, "warning", "ok"),
+      run_id = run_id
+    )
+    recal <- recalibration_factor_audit(tmp, cid, cname, "A", attempt_order, formula_text, run_id)
     return(list(result = res, convergence_status = ifelse(length(warn_text) > 0L, "warning", "ok"),
                 warnings = warn_text, failure_reason = NA_character_,
-                formula = "sex + pandemic_phase + s(age) + s(age,by=sex_male) + s(year) + re(region) + offset(log(pop))",
+                formula = formula_text,
                 aggregation_age = "single_age",
                 aggregation_year = "single_year",
                 aggregation_region = "department_partial_pooling",
-                rows_train = nrow(base_dt)))
+                rows_train = nrow(base_dt),
+                coefficients = diag$coefficients,
+                smooth_terms = diag$smooth_terms,
+                fit_metrics = diag$fit_metrics,
+                recalibration_factors = recal,
+                heuristic_values = data.table(),
+                model_summary_text = diag$summary_text,
+                prediction_diag_year_sex = prediction_diagnostics_audit(tmp, cid, cname, "A", attempt_order, formula_text, run_id, c("year_id", "sex_id")),
+                prediction_diag_age_year_sex = prediction_diagnostics_audit(tmp, cid, cname, "A", attempt_order, formula_text, run_id, c("year_id", "sex_id", "age"))))
   }
   
   if (path_code == "B") {
@@ -797,13 +1276,30 @@ try_fit_path <- function(path_code, base_dt, audit_row, parent_result = NULL) {
       regions_with_deaths = audit_row$regions_with_deaths[1]
     )
     
+    formula_text <- "sex + pandemic_phase + s(age) + s(year) + re(region) + offset(log(pop))"
+    diag <- extract_model_diagnostics(
+      fit, cid, cname, "B", attempt_order, formula_text,
+      rows_train = nrow(base_dt), rows_pred = nrow(base_dt),
+      warning_text = paste(unique(warn_text), collapse = " | "),
+      convergence_status = ifelse(length(warn_text) > 0L, "warning", "ok"),
+      run_id = run_id
+    )
+    recal <- recalibration_factor_audit(tmp, cid, cname, "B", attempt_order, formula_text, run_id)
     return(list(result = res, convergence_status = ifelse(length(warn_text) > 0L, "warning", "ok"),
                 warnings = warn_text, failure_reason = NA_character_,
-                formula = "sex + pandemic_phase + s(age) + s(year) + re(region) + offset(log(pop))",
+                formula = formula_text,
                 aggregation_age = "single_age",
                 aggregation_year = "single_year",
                 aggregation_region = "department_partial_pooling",
-                rows_train = nrow(base_dt)))
+                rows_train = nrow(base_dt),
+                coefficients = diag$coefficients,
+                smooth_terms = diag$smooth_terms,
+                fit_metrics = diag$fit_metrics,
+                recalibration_factors = recal,
+                heuristic_values = data.table(),
+                model_summary_text = diag$summary_text,
+                prediction_diag_year_sex = prediction_diagnostics_audit(tmp, cid, cname, "B", attempt_order, formula_text, run_id, c("year_id", "sex_id")),
+                prediction_diag_age_year_sex = prediction_diagnostics_audit(tmp, cid, cname, "B", attempt_order, formula_text, run_id, c("year_id", "sex_id", "age"))))
   }
   
   if (path_code == "C") {
@@ -856,13 +1352,30 @@ try_fit_path <- function(path_code, base_dt, audit_row, parent_result = NULL) {
       regions_with_deaths = audit_row$regions_with_deaths[1]
     )
     
+    formula_text <- "sex + pandemic_phase + age_band + s(year) + re(region) + offset(log(pop))"
+    diag <- extract_model_diagnostics(
+      fit, cid, cname, "C", attempt_order, formula_text,
+      rows_train = nrow(train_c), rows_pred = nrow(base_dt),
+      warning_text = paste(unique(warn_text), collapse = " | "),
+      convergence_status = ifelse(length(warn_text) > 0L, "warning", "ok"),
+      run_id = run_id
+    )
+    recal <- recalibration_factor_audit(tmp, cid, cname, "C", attempt_order, formula_text, run_id)
     return(list(result = res, convergence_status = ifelse(length(warn_text) > 0L, "warning", "ok"),
                 warnings = warn_text, failure_reason = NA_character_,
-                formula = "sex + pandemic_phase + age_band + s(year) + re(region) + offset(log(pop))",
+                formula = formula_text,
                 aggregation_age = "age_band_protocol",
                 aggregation_year = "single_year",
                 aggregation_region = "department_partial_pooling",
-                rows_train = nrow(train_c)))
+                rows_train = nrow(train_c),
+                coefficients = diag$coefficients,
+                smooth_terms = diag$smooth_terms,
+                fit_metrics = diag$fit_metrics,
+                recalibration_factors = recal,
+                heuristic_values = data.table(),
+                model_summary_text = diag$summary_text,
+                prediction_diag_year_sex = prediction_diagnostics_audit(tmp, cid, cname, "C", attempt_order, formula_text, run_id, c("year_id", "sex_id")),
+                prediction_diag_age_year_sex = prediction_diagnostics_audit(tmp, cid, cname, "C", attempt_order, formula_text, run_id, c("year_id", "sex_id", "age"))))
   }
   
   if (path_code == "D") {
@@ -915,13 +1428,30 @@ try_fit_path <- function(path_code, base_dt, audit_row, parent_result = NULL) {
       regions_with_deaths = audit_row$regions_with_deaths[1]
     )
     
+    formula_text <- "sex + period + age_band + re(region) + offset(log(pop))"
+    diag <- extract_model_diagnostics(
+      fit, cid, cname, "D", attempt_order, formula_text,
+      rows_train = nrow(train_d), rows_pred = nrow(base_dt),
+      warning_text = paste(unique(warn_text), collapse = " | "),
+      convergence_status = ifelse(length(warn_text) > 0L, "warning", "ok"),
+      run_id = run_id
+    )
+    recal <- recalibration_factor_audit(tmp, cid, cname, "D", attempt_order, formula_text, run_id)
     return(list(result = res, convergence_status = ifelse(length(warn_text) > 0L, "warning", "ok"),
                 warnings = warn_text, failure_reason = NA_character_,
-                formula = "sex + period + age_band + re(region) + offset(log(pop))",
+                formula = formula_text,
                 aggregation_age = "age_band_protocol",
                 aggregation_year = "period_2018_2019__2020_2021__2022_2024",
                 aggregation_region = "department_partial_pooling",
-                rows_train = nrow(train_d)))
+                rows_train = nrow(train_d),
+                coefficients = diag$coefficients,
+                smooth_terms = diag$smooth_terms,
+                fit_metrics = diag$fit_metrics,
+                recalibration_factors = recal,
+                heuristic_values = data.table(),
+                model_summary_text = diag$summary_text,
+                prediction_diag_year_sex = prediction_diagnostics_audit(tmp, cid, cname, "D", attempt_order, formula_text, run_id, c("year_id", "sex_id")),
+                prediction_diag_age_year_sex = prediction_diagnostics_audit(tmp, cid, cname, "D", attempt_order, formula_text, run_id, c("year_id", "sex_id", "age"))))
   }
   
   if (path_code == "E") {
@@ -983,13 +1513,30 @@ try_fit_path <- function(path_code, base_dt, audit_row, parent_result = NULL) {
       regions_with_deaths = audit_row$regions_with_deaths[1]
     )
     
+    formula_text <- "borrow_parent_shape_rescaled_within_year_sex"
+    recal <- recalibration_factor_audit(x, cid, cname, "E", attempt_order, formula_text, run_id)
+    heur <- heuristic_value_audit(
+      base_dt, res, cid, cname, "E", attempt_order, formula_text,
+      borrowed_from_cause = unique(na.omit(x$borrowed_from_cause))[1],
+      borrowed_from_level = unique(na.omit(x$borrowed_from_level))[1],
+      rationale = "Se presto la forma de la causa padre ya modelada y se reescalo por year_id + sex_id.",
+      run_id = run_id
+    )
     return(list(result = res, convergence_status = "borrowed", warnings = character(),
                 failure_reason = NA_character_,
-                formula = "borrow_parent_shape_rescaled_within_year_sex",
+                formula = formula_text,
                 aggregation_age = "borrow_parent",
                 aggregation_year = "borrow_parent",
                 aggregation_region = "borrow_parent_shape",
-                rows_train = nrow(base_dt)))
+                rows_train = nrow(base_dt),
+                coefficients = data.table(),
+                smooth_terms = data.table(),
+                fit_metrics = data.table(),
+                recalibration_factors = recal,
+                heuristic_values = heur,
+                model_summary_text = character(),
+                prediction_diag_year_sex = prediction_diagnostics_audit(x, cid, cname, "E", attempt_order, formula_text, run_id, c("year_id", "sex_id")),
+                prediction_diag_age_year_sex = prediction_diagnostics_audit(x, cid, cname, "E", attempt_order, formula_text, run_id, c("year_id", "sex_id", "age"))))
   }
   
   if (path_code == "F") {
@@ -1014,13 +1561,30 @@ try_fit_path <- function(path_code, base_dt, audit_row, parent_result = NULL) {
       regions_with_deaths = audit_row$regions_with_deaths[1]
     )
     
+    formula_text <- "raw_no_model"
+    tmp <- copy(base_dt)
+    tmp[, `:=`(pred_deaths = deaths_final, pred_recal = deaths_final)]
+    recal <- recalibration_factor_audit(tmp, cid, cname, "F", attempt_order, formula_text, run_id)
+    heur <- heuristic_value_audit(
+      base_dt, res, cid, cname, "F", attempt_order, formula_text,
+      rationale = "Fallback crudo: se conserva el valor observado porque modelar seria menos seguro.",
+      run_id = run_id
+    )
     return(list(result = res, convergence_status = "not_applicable", warnings = character(),
                 failure_reason = NA_character_,
-                formula = "raw_no_model",
+                formula = formula_text,
                 aggregation_age = "single_age",
                 aggregation_year = "single_year",
                 aggregation_region = "none_raw",
-                rows_train = nrow(base_dt)))
+                rows_train = nrow(base_dt),
+                coefficients = data.table(),
+                smooth_terms = data.table(),
+                fit_metrics = data.table(),
+                recalibration_factors = recal,
+                heuristic_values = heur,
+                model_summary_text = character(),
+                prediction_diag_year_sex = prediction_diagnostics_audit(tmp, cid, cname, "F", attempt_order, formula_text, run_id, c("year_id", "sex_id")),
+                prediction_diag_age_year_sex = prediction_diagnostics_audit(tmp, cid, cname, "F", attempt_order, formula_text, run_id, c("year_id", "sex_id", "age"))))
   }
   
   list(result = NULL, convergence_status = "unknown", warnings = character(),
@@ -1283,6 +1847,16 @@ tryCatch({
   audit_list <- vector("list", nrow(cause_meta))
   attempt_log_list <- list()
   registry_list <- vector("list", nrow(cause_meta))
+  coefficient_list <- list()
+  smooth_term_list <- list()
+  fit_metric_list <- list()
+  recalibration_factor_list <- list()
+  heuristic_value_list <- list()
+  prediction_diag_year_sex_list <- list()
+  prediction_diag_age_year_sex_list <- list()
+  model_validation_list <- list()
+  model_summary_list <- list()
+  statistical_assessment_list <- list()
   
   msg("Construyendo auditoría de suficiencia y modelando causas terminales.")
   
@@ -1320,17 +1894,30 @@ tryCatch({
       audit_row = audit_i,
       has_parent = has_parent
     )
+    paths_comp <- candidate_paths_for_competition(paths)
+    validation_i <- validate_candidate_paths(base_i, paths_comp)
+    winner_i <- choose_competition_winner(validation_i, paths_comp)
+    selected_preferred <- winner_i$method_code %||% NA_character_
+    validation_i[, `:=`(
+      cause_concept_id = cid,
+      cause_name = cname,
+      selected_by_competition = method_code == selected_preferred,
+      competition_decision_reason = winner_i$reason,
+      run_id = run_id
+    )]
+    model_validation_list[[length(model_validation_list) + 1L]] <- validation_i
     
     chosen <- NULL
     chosen_code <- NA_character_
     chosen_conv <- NA_character_
     chosen_warn_flag <- FALSE
+    accepted_candidates <- list()
     
-    for (attempt_idx in seq_along(paths)) {
-      pc <- paths[attempt_idx]
+    for (attempt_idx in seq_along(paths_comp)) {
+      pc <- paths_comp[attempt_idx]
       
       res_try <- tryCatch(
-        try_fit_path(pc, base_i, audit_row = audit_i, parent_result = parent_result),
+        try_fit_path(pc, base_i, audit_row = audit_i, parent_result = parent_result, attempt_order = attempt_idx),
         error = function(e) list(
           result = NULL,
           convergence_status = "error",
@@ -1373,18 +1960,62 @@ tryCatch({
         borrowed_from_level = if (!is.null(res_try$result)) unique(res_try$result$borrowed_from_level)[1] else NA_integer_,
         run_id = run_id
       )
+      if (is.data.table(res_try$coefficients) && nrow(res_try$coefficients)) {
+        coefficient_list[[length(coefficient_list) + 1L]] <- copy(res_try$coefficients)
+      }
+      if (is.data.table(res_try$smooth_terms) && nrow(res_try$smooth_terms)) {
+        smooth_term_list[[length(smooth_term_list) + 1L]] <- copy(res_try$smooth_terms)
+      }
+      if (is.data.table(res_try$fit_metrics) && nrow(res_try$fit_metrics)) {
+        fit_metric_list[[length(fit_metric_list) + 1L]] <- copy(res_try$fit_metrics)
+      }
+      if (is.data.table(res_try$recalibration_factors) && nrow(res_try$recalibration_factors)) {
+        recalibration_factor_list[[length(recalibration_factor_list) + 1L]] <- copy(res_try$recalibration_factors)
+      }
+      if (is.data.table(res_try$heuristic_values) && nrow(res_try$heuristic_values)) {
+        heuristic_value_list[[length(heuristic_value_list) + 1L]] <- copy(res_try$heuristic_values)
+      }
+      if (length(res_try$model_summary_text %||% character())) {
+        model_summary_list[[length(model_summary_list) + 1L]] <- list(
+          cause_concept_id = cid,
+          cause_name = cname,
+          method_code = pc,
+          attempt_order = attempt_idx,
+          summary_text = res_try$model_summary_text
+        )
+      }
       
       if (eval_try$ok) {
-        chosen <- res_try$result
-        chosen_code <- pc
-        chosen_conv <- res_try$convergence_status
-        chosen_warn_flag <- length(res_try$warnings) > 0L
-        break
+        accepted_candidates[[pc]] <- list(
+          result = res_try$result,
+          code = pc,
+          conv = res_try$convergence_status,
+          warn_flag = length(res_try$warnings) > 0L,
+          prediction_diag_year_sex = res_try$prediction_diag_year_sex,
+          prediction_diag_age_year_sex = res_try$prediction_diag_age_year_sex
+        )
+        if (is.null(chosen)) {
+          chosen <- res_try$result
+          chosen_code <- pc
+          chosen_conv <- res_try$convergence_status
+          chosen_warn_flag <- length(res_try$warnings) > 0L
+        }
+        if (!is.na(selected_preferred) && identical(pc, selected_preferred)) {
+          chosen <- res_try$result
+          chosen_code <- pc
+          chosen_conv <- res_try$convergence_status
+          chosen_warn_flag <- length(res_try$warnings) > 0L
+        }
       }
     }
-    
+    if (length(accepted_candidates) && !(chosen_code %in% names(accepted_candidates)) && !is.na(selected_preferred) && selected_preferred %in% names(accepted_candidates)) {
+      chosen <- accepted_candidates[[selected_preferred]]$result
+      chosen_code <- accepted_candidates[[selected_preferred]]$code
+      chosen_conv <- accepted_candidates[[selected_preferred]]$conv
+      chosen_warn_flag <- accepted_candidates[[selected_preferred]]$warn_flag
+    }
     if (is.null(chosen)) {
-      emergency <- try_fit_path("F", base_i, audit_row = audit_i, parent_result = NULL)
+      emergency <- try_fit_path("F", base_i, audit_row = audit_i, parent_result = NULL, attempt_order = length(paths_comp) + 1L)
       chosen <- emergency$result
       chosen_code <- "F"
       chosen_conv <- "fallback_raw_emergency"
@@ -1393,7 +2024,7 @@ tryCatch({
       attempt_log_list[[length(attempt_log_list) + 1L]] <- data.table(
         cause_concept_id = cid,
         cause_name = cname,
-        attempt_order = length(paths) + 1L,
+        attempt_order = length(paths_comp) + 1L,
         method_code = "F_emergency",
         attempt_status = "accepted",
         failure_reason = NA_character_,
@@ -1416,7 +2047,53 @@ tryCatch({
         borrowed_from_level = NA_integer_,
         run_id = run_id
       )
+      if (is.data.table(emergency$coefficients) && nrow(emergency$coefficients)) {
+        coefficient_list[[length(coefficient_list) + 1L]] <- copy(emergency$coefficients)
+      }
+      if (is.data.table(emergency$smooth_terms) && nrow(emergency$smooth_terms)) {
+        smooth_term_list[[length(smooth_term_list) + 1L]] <- copy(emergency$smooth_terms)
+      }
+      if (is.data.table(emergency$fit_metrics) && nrow(emergency$fit_metrics)) {
+        fit_metric_list[[length(fit_metric_list) + 1L]] <- copy(emergency$fit_metrics)
+      }
+      if (is.data.table(emergency$recalibration_factors) && nrow(emergency$recalibration_factors)) {
+        recalibration_factor_list[[length(recalibration_factor_list) + 1L]] <- copy(emergency$recalibration_factors)
+      }
+      if (is.data.table(emergency$heuristic_values) && nrow(emergency$heuristic_values)) {
+        heuristic_value_list[[length(heuristic_value_list) + 1L]] <- copy(emergency$heuristic_values)
+      }
+      if (is.data.table(emergency$prediction_diag_year_sex) && nrow(emergency$prediction_diag_year_sex)) {
+        prediction_diag_year_sex_list[[length(prediction_diag_year_sex_list) + 1L]] <- copy(emergency$prediction_diag_year_sex)
+      }
+      if (is.data.table(emergency$prediction_diag_age_year_sex) && nrow(emergency$prediction_diag_age_year_sex)) {
+        prediction_diag_age_year_sex_list[[length(prediction_diag_age_year_sex_list) + 1L]] <- copy(emergency$prediction_diag_age_year_sex)
+      }
+    } else if (chosen_code %in% names(accepted_candidates)) {
+      final_diag <- accepted_candidates[[chosen_code]]
+      if (is.data.table(final_diag$prediction_diag_year_sex) && nrow(final_diag$prediction_diag_year_sex)) {
+        prediction_diag_year_sex_list[[length(prediction_diag_year_sex_list) + 1L]] <- copy(final_diag$prediction_diag_year_sex)
+      }
+      if (is.data.table(final_diag$prediction_diag_age_year_sex) && nrow(final_diag$prediction_diag_age_year_sex)) {
+        prediction_diag_age_year_sex_list[[length(prediction_diag_age_year_sex_list) + 1L]] <- copy(final_diag$prediction_diag_age_year_sex)
+      }
     }
+    statistical_assessment_list[[length(statistical_assessment_list) + 1L]] <- data.table(
+      cause_concept_id = cid,
+      cause_name = cname,
+      method_selected_by_competition = selected_preferred,
+      method_selected_final = chosen_code,
+      competition_decision_reason = winner_i$reason,
+      final_verdict_statistical = fifelse(chosen_code %in% c("F", "F_emergency"), "OK_CON_NOTA_fallback_documentado",
+                                          fifelse(chosen_warn_flag, "OK_CON_NOTA_warnings_documentados", "OK_modelo_validado")),
+      expert_statistical_conclusion = fifelse(
+        chosen_code %in% c("F", "F_emergency"),
+        "Se uso fallback crudo porque no hubo un candidato GAM suficientemente seguro; se preserva masa y se documenta como decision conservadora.",
+        fifelse(chosen_warn_flag,
+                "El modelo seleccionado tiene warnings, pero no fueron criticos para seleccion o fueron compatibles con muertes fraccionales; se valida con cierre de masa y diagnosticos graficos.",
+                "El modelo seleccionado paso la competencia conservadora sin warnings bloqueantes.")
+      ),
+      run_id = run_id
+    )
     
     if (nrow(base_i_excluded) > 0L) {
       excluded_zero <- make_result_dt(
@@ -1478,6 +2155,178 @@ tryCatch({
   mortality_data_sufficiency_audit <- rbindlist(audit_list, use.names = TRUE, fill = TRUE)
   mortality_model_attempt_log <- rbindlist(attempt_log_list, use.names = TRUE, fill = TRUE)
   mortality_model_registry <- rbindlist(registry_list, use.names = TRUE, fill = TRUE)
+  mortality_model_coefficients <- if (length(coefficient_list)) {
+    rbindlist(coefficient_list, use.names = TRUE, fill = TRUE)
+  } else {
+    data.table(
+      cause_concept_id = integer(), cause_name = character(), method_code = character(),
+      attempt_order = integer(), term = character(), formula = character(), run_id = character()
+    )
+  }
+  mortality_model_smooth_terms <- if (length(smooth_term_list)) {
+    rbindlist(smooth_term_list, use.names = TRUE, fill = TRUE)
+  } else {
+    data.table(
+      cause_concept_id = integer(), cause_name = character(), method_code = character(),
+      attempt_order = integer(), smooth_term = character(), formula = character(), run_id = character()
+    )
+  }
+  mortality_model_recalibration_factors <- if (length(recalibration_factor_list)) {
+    rbindlist(recalibration_factor_list, use.names = TRUE, fill = TRUE)
+  } else {
+    data.table(
+      cause_concept_id = integer(), cause_name = character(), method_code = character(),
+      attempt_order = integer(), year_id = integer(), sex_id = integer(),
+      observed_mass = numeric(), initial_prediction_mass = numeric(),
+      smoothed_final_mass = numeric(), recalibration_factor = numeric(),
+      final_mass_diff = numeric(), run_id = character()
+    )
+  }
+  mortality_model_heuristic_values <- if (length(heuristic_value_list)) {
+    rbindlist(heuristic_value_list, use.names = TRUE, fill = TRUE)
+  } else {
+    data.table(
+      cause_concept_id = integer(), cause_name = character(), method_code = character(),
+      attempt_order = integer(), heuristic_rule = character(), borrowed_from_cause = integer(),
+      borrowed_from_level = integer(), mass_input = numeric(), mass_output = numeric(),
+      max_abs_year_sex_diff = numeric(), rationale = character(), run_id = character()
+    )
+  }
+  mortality_model_prediction_diagnostics_year_sex <- if (length(prediction_diag_year_sex_list)) {
+    rbindlist(prediction_diag_year_sex_list, use.names = TRUE, fill = TRUE)
+  } else {
+    data.table(
+      cause_concept_id = integer(), cause_name = character(), method_code = character(),
+      attempt_order = integer(), year_id = integer(), sex_id = integer(),
+      observed = numeric(), pred_initial = numeric(), pred_recalibrated = numeric(),
+      recalibration_factor = numeric(), diff_initial = numeric(), diff_recalibrated = numeric(),
+      resid_proxy_initial = numeric(), resid_proxy_recalibrated = numeric(), run_id = character()
+    )
+  }
+  mortality_model_prediction_diagnostics_age_year_sex <- if (length(prediction_diag_age_year_sex_list)) {
+    rbindlist(prediction_diag_age_year_sex_list, use.names = TRUE, fill = TRUE)
+  } else {
+    data.table(
+      cause_concept_id = integer(), cause_name = character(), method_code = character(),
+      attempt_order = integer(), year_id = integer(), sex_id = integer(), age = integer(),
+      observed = numeric(), pred_initial = numeric(), pred_recalibrated = numeric(),
+      recalibration_factor = numeric(), diff_initial = numeric(), diff_recalibrated = numeric(),
+      resid_proxy_initial = numeric(), resid_proxy_recalibrated = numeric(), run_id = character()
+    )
+  }
+  mortality_model_candidate_validation <- if (length(model_validation_list)) {
+    rbindlist(model_validation_list, use.names = TRUE, fill = TRUE)
+  } else {
+    data.table()
+  }
+  mortality_model_statistical_assessment <- if (length(statistical_assessment_list)) {
+    rbindlist(statistical_assessment_list, use.names = TRUE, fill = TRUE)
+  } else {
+    data.table()
+  }
+  mortality_model_fit_metrics_core <- if (length(fit_metric_list)) {
+    rbindlist(fit_metric_list, use.names = TRUE, fill = TRUE)
+  } else {
+    data.table()
+  }
+  accepted_attempts <- mortality_model_attempt_log[
+    attempt_status == "accepted",
+    .SD[.N],
+    by = cause_concept_id
+  ][, .(
+    cause_concept_id,
+    selected_attempt_order = attempt_order,
+    accepted_method_code = method_code,
+    accepted_formula = formula,
+    accepted_rows_train = rows_train,
+    accepted_rows_pred = rows_pred,
+    accepted_max_abs_mass_diff = max_abs_mass_diff,
+    accepted_warnings = warnings
+  )]
+  mortality_model_fit_metrics <- merge(
+    mortality_model_registry[, .(
+      cause_concept_id, cause_name, method_selected, data_category,
+      model_status, convergence_status, warning_flag,
+      mass_input, mass_output, run_id
+    )],
+    accepted_attempts,
+    by = "cause_concept_id",
+    all.x = TRUE,
+    sort = FALSE
+  )
+  if (nrow(mortality_model_fit_metrics_core)) {
+    mortality_model_fit_metrics <- merge(
+      mortality_model_fit_metrics,
+      mortality_model_fit_metrics_core,
+      by.x = c("cause_concept_id", "method_selected"),
+      by.y = c("cause_concept_id", "method_code"),
+      all.x = TRUE,
+      sort = FALSE,
+      suffixes = c("", "_model")
+    )
+  }
+  mortality_model_fit_metrics[, `:=`(
+    mass_diff = mass_output - mass_input,
+    metric_source = fifelse(method_selected %in% c("A", "B", "C", "D"),
+                            "mgcv_summary_captured_during_canonical_fit",
+                            "heuristic_or_fallback_registry")
+  )]
+  mortality_model_warning_summary <- copy(mortality_model_fit_metrics[, .(
+    cause_concept_id, cause_name, method_selected,
+    warning_flag,
+    warning_severity = vapply(accepted_warnings, function(x) classify_model_warnings(x)$severity, character(1)),
+    warning_is_critical = vapply(accepted_warnings, function(x) classify_model_warnings(x)$is_critical, logical(1)),
+    warning_note = vapply(accepted_warnings, function(x) classify_model_warnings(x)$note, character(1)),
+    warning_excerpt = substr(accepted_warnings, 1, 500)
+  )])
+  mortality_model_coefficient_assessment <- if (nrow(mortality_model_coefficients)) {
+    z_col <- intersect(c("z.value", "z", "z.value."), names(mortality_model_coefficients))[1]
+    p_col <- intersect(c("Pr...z..", "Pr...t..", "p.value"), names(mortality_model_coefficients))[1]
+    mortality_model_coefficients[, .(
+      n_coefficients = .N,
+      n_z_missing = if (length(z_col) && !is.na(z_col)) sum(is.na(get(z_col))) else NA_integer_,
+      n_p_missing = if (length(p_col) && !is.na(p_col)) sum(is.na(get(p_col))) else NA_integer_,
+      n_zero_se = if ("Std..Error" %in% names(.SD)) sum(is.na(Std..Error) | Std..Error == 0) else NA_integer_,
+      coefficient_assessment = {
+        nz <- if (length(z_col) && !is.na(z_col)) sum(is.na(get(z_col))) else 0L
+        if (nz > 0L) "OK_CON_NOTA_coeficiente_no_estimable_revisar_contexto" else "OK_coeficientes_estimables"
+      }
+    ), by = .(cause_concept_id, cause_name, method_code)]
+  } else {
+    data.table()
+  }
+  validation_selected <- mortality_model_candidate_validation[selected_by_competition == TRUE, .(
+    cause_concept_id, selected_validation_method = method_code, validation_strategy,
+    validation_deviance, validation_mae, validation_rmse, validation_bias,
+    validation_warning_severity = warning_severity,
+    validation_warning_is_critical = warning_is_critical,
+    competition_decision_reason
+  )]
+  mortality_model_fit_metrics_compact <- merge(
+    mortality_model_fit_metrics[, .(
+      cause_concept_id, cause_name, method_selected, accepted_formula,
+      aic, deviance_explained, n_observations, warning_flag,
+      mass_input, mass_output, mass_diff, accepted_max_abs_mass_diff
+    )],
+    validation_selected,
+    by = "cause_concept_id",
+    all.x = TRUE,
+    sort = FALSE
+  )
+  mortality_model_fit_metrics_compact <- merge(
+    mortality_model_fit_metrics_compact,
+    mortality_model_warning_summary[, .(cause_concept_id, warning_severity, warning_is_critical, warning_note)],
+    by = "cause_concept_id",
+    all.x = TRUE,
+    sort = FALSE
+  )
+  mortality_model_fit_metrics_compact <- merge(
+    mortality_model_fit_metrics_compact,
+    mortality_model_statistical_assessment[, .(cause_concept_id, final_verdict_statistical, expert_statistical_conclusion)],
+    by = "cause_concept_id",
+    all.x = TRUE,
+    sort = FALSE
+  )
   
   covid_specific_id <- cm[cause_name == "COVID-19" & is_terminal == TRUE, cause_concept_id][1]
   oprm_id <- cm[cause_name == "Other pandemic related mortality (OPRM)" & is_terminal == TRUE, cause_concept_id][1]
@@ -1681,6 +2530,19 @@ tryCatch({
   suff_audit_path <- file.path(CFG$qc_dir, "mortality_data_sufficiency_audit.csv")
   attempt_log_path <- file.path(CFG$qc_dir, "mortality_model_attempt_log.csv")
   model_registry_path <- file.path(CFG$qc_dir, "mortality_model_registry.csv")
+  model_fit_metrics_path <- file.path(CFG$qc_dir, "mortality_model_fit_metrics.csv")
+  model_coefficients_path <- file.path(CFG$qc_dir, "mortality_model_coefficients.csv")
+  model_smooth_terms_path <- file.path(CFG$qc_dir, "mortality_model_smooth_terms.csv")
+  model_recalibration_factors_path <- file.path(CFG$qc_dir, "mortality_model_recalibration_factors.csv")
+  model_heuristic_values_path <- file.path(CFG$qc_dir, "mortality_model_heuristic_values.csv")
+  model_prediction_diagnostics_year_sex_path <- file.path(CFG$qc_dir, "mortality_model_prediction_diagnostics_year_sex.csv")
+  model_prediction_diagnostics_age_year_sex_path <- file.path(CFG$qc_dir, "mortality_model_prediction_diagnostics_age_year_sex.csv")
+  model_candidate_validation_path <- file.path(CFG$qc_dir, "mortality_model_candidate_validation.csv")
+  model_warning_summary_path <- file.path(CFG$qc_dir, "mortality_model_warning_summary.csv")
+  model_coefficient_assessment_path <- file.path(CFG$qc_dir, "mortality_model_coefficient_assessment.csv")
+  model_statistical_assessment_path <- file.path(CFG$qc_dir, "mortality_model_statistical_assessment.csv")
+  model_fit_metrics_compact_path <- file.path(CFG$qc_dir, "mortality_model_fit_metrics_compact.csv")
+  model_summary_dir <- file.path(CFG$qc_dir, "model_summaries_txt")
   qc_mass_by_cause_path <- file.path(CFG$qc_dir, "qc_mass_preservation_by_cause.csv")
   qc_top_absurd_rates_path <- file.path(CFG$qc_dir, "qc_top_absurd_rates.csv")
   qc_temporal_roughness_path <- file.path(CFG$qc_dir, "qc_temporal_roughness.csv")
@@ -1696,6 +2558,35 @@ tryCatch({
   fwrite(mortality_data_sufficiency_audit, suff_audit_path)
   fwrite(mortality_model_attempt_log, attempt_log_path)
   fwrite(mortality_model_registry, model_registry_path)
+  fwrite(mortality_model_fit_metrics, model_fit_metrics_path)
+  fwrite(mortality_model_coefficients, model_coefficients_path)
+  fwrite(mortality_model_smooth_terms, model_smooth_terms_path)
+  fwrite(mortality_model_recalibration_factors, model_recalibration_factors_path)
+  fwrite(mortality_model_heuristic_values, model_heuristic_values_path)
+  fwrite(mortality_model_prediction_diagnostics_year_sex, model_prediction_diagnostics_year_sex_path)
+  fwrite(mortality_model_prediction_diagnostics_age_year_sex, model_prediction_diagnostics_age_year_sex_path)
+  fwrite(mortality_model_candidate_validation, model_candidate_validation_path)
+  fwrite(mortality_model_warning_summary, model_warning_summary_path)
+  fwrite(mortality_model_coefficient_assessment, model_coefficient_assessment_path)
+  fwrite(mortality_model_statistical_assessment, model_statistical_assessment_path)
+  fwrite(mortality_model_fit_metrics_compact, model_fit_metrics_compact_path)
+  dir.create(model_summary_dir, recursive = TRUE, showWarnings = FALSE)
+  if (length(model_summary_list)) {
+    for (sm_i in model_summary_list) {
+      summary_path <- file.path(
+        model_summary_dir,
+        sprintf("cause_%s_method_%s_attempt_%s_summary.txt", sm_i$cause_concept_id, sm_i$method_code, sm_i$attempt_order)
+      )
+      writeLines(c(
+        paste("cause_concept_id:", sm_i$cause_concept_id),
+        paste("cause_name:", sm_i$cause_name),
+        paste("method_code:", sm_i$method_code),
+        paste("attempt_order:", sm_i$attempt_order),
+        "",
+        sm_i$summary_text
+      ), summary_path, useBytes = TRUE)
+    }
+  }
   fwrite(qc_mass_preservation_by_cause, qc_mass_by_cause_path)
   fwrite(qc_top_absurd_rates, qc_top_absurd_rates_path)
   fwrite(qc_temporal_roughness, qc_temporal_roughness_path)
@@ -1748,6 +2639,18 @@ tryCatch({
     suff_audit_path,
     attempt_log_path,
     model_registry_path,
+    model_fit_metrics_path,
+    model_coefficients_path,
+    model_smooth_terms_path,
+    model_recalibration_factors_path,
+    model_heuristic_values_path,
+    model_prediction_diagnostics_year_sex_path,
+    model_prediction_diagnostics_age_year_sex_path,
+    model_candidate_validation_path,
+    model_warning_summary_path,
+    model_coefficient_assessment_path,
+    model_statistical_assessment_path,
+    model_fit_metrics_compact_path,
     qc_mass_by_cause_path,
     qc_top_absurd_rates_path,
     qc_temporal_roughness_path,
