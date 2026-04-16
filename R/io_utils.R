@@ -138,6 +138,15 @@ normalize_runtime_path <- function(path, base_root = here::here()) {
   normalizePath(candidate, winslash = "/", mustWork = FALSE)
 }
 
+path_exists_with_retry <- function(path, retries = 3L, wait_sec = 2) {
+  if (is.null(path) || length(path) == 0L || is.na(path) || !nzchar(path)) return(FALSE)
+  for (i in seq_len(max(1L, as.integer(retries)))) {
+    if (file.exists(path)) return(TRUE)
+    Sys.sleep(wait_sec)
+  }
+  FALSE
+}
+
 get_runtime_override <- function(runtime_cfg, key) {
   if (is.null(runtime_cfg) || is.null(runtime_cfg$inputs) || is.null(runtime_cfg$inputs[[key]])) return(NA_character_)
   val <- runtime_cfg$inputs[[key]]
@@ -167,7 +176,7 @@ resolve_runtime_input_path <- function(key,
     normalize_runtime_path(default_repo_relative)
   )
   candidates <- unique(stats::na.omit(candidates))
-  hit <- candidates[file.exists(candidates)][1]
+  hit <- candidates[vapply(candidates, path_exists_with_retry, logical(1))][1]
   if (length(hit) == 0L || is.na(hit)) {
     if (isTRUE(must_work)) {
       stop("No se pudo resolver input runtime para ", key, ". Intentados: ", paste(candidates, collapse = " | "))
@@ -206,7 +215,7 @@ resolve_external_dataset_path <- function(key,
     normalize_runtime_path(rel)
   )
   candidates <- unique(stats::na.omit(candidates))
-  hit <- candidates[file.exists(candidates)][1]
+  hit <- candidates[vapply(candidates, path_exists_with_retry, logical(1))][1]
   if (length(hit) == 0L || is.na(hit)) {
     if (isTRUE(must_work)) {
       stop("No se pudo resolver external dataset ", key, ". Intentados: ", paste(candidates, collapse = " | "))

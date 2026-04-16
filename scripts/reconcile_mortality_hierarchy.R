@@ -288,9 +288,9 @@ tryCatch({
   pop_path <- resolve_external_dataset_path(
     key = "population_result",
     external_yaml_path = CFG$external_yaml_path,
-    must_work = TRUE
+    must_work = FALSE
   )
-  if (!file.exists(pop_path)) stop("No existe population_result: ", pop_path)
+  if (!path_exists_with_retry(pop_path, retries = 5L, wait_sec = 2)) stop("No existe population_result: ", pop_path)
   
   msg("Leyendo mortality_rate_cause_smoothed.")
   dt <- as.data.table(read_auto(smoothed_path))

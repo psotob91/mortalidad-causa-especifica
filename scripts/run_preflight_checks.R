@@ -14,7 +14,7 @@ strict_mode <- !("--no-strict" %in% args)
 out_dir <- here("data", "derived", "qc", "run_pipeline")
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 
-is_readable <- function(path) file.exists(path) && file.access(path, 4) == 0
+is_readable <- function(path) path_exists_with_retry(path, retries = 5L, wait_sec = 2)
 is_writable_dir <- function(path) dir.exists(path) && file.access(path, 2) == 0
 
 runtime_cfg <- read_runtime_paths()

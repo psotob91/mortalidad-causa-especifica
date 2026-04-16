@@ -391,9 +391,9 @@ tryCatch({
   lt_path <- resolve_external_dataset_path(
     key = "life_table_standard_single_age",
     external_yaml_path = CFG$external_yaml_path,
-    must_work = TRUE
+    must_work = FALSE
   )
-  if (!file.exists(lt_path)) stop("No existe life_table_standard_single_age: ", lt_path)
+  if (!path_exists_with_retry(lt_path, retries = 5L, wait_sec = 2)) stop("No existe life_table_standard_single_age: ", lt_path)
   
   msg("Leyendo mortalidad reconciliada.")
   mort <- as.data.table(read_auto(mort_path))

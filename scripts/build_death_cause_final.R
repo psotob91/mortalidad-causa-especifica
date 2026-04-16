@@ -286,16 +286,16 @@ tryCatch({
   pop_path <- resolve_external_dataset_path(
     key = "population_result",
     external_yaml_path = CFG$external_yaml_path,
-    must_work = TRUE
+    must_work = FALSE
   )
   ltm_path <- resolve_external_dataset_path(
     key = "life_table_mortality_single_age",
     external_yaml_path = CFG$external_yaml_path,
-    must_work = TRUE
+    must_work = FALSE
   )
   
-  if (!file.exists(pop_path)) stop("No existe population_result en ruta externa: ", pop_path)
-  if (!file.exists(ltm_path)) stop("No existe life_table_mortality_single_age en ruta externa: ", ltm_path)
+  if (!path_exists_with_retry(pop_path, retries = 5L, wait_sec = 2)) stop("No existe population_result en ruta externa: ", pop_path)
+  if (!path_exists_with_retry(ltm_path, retries = 5L, wait_sec = 2)) stop("No existe life_table_mortality_single_age en ruta externa: ", ltm_path)
   
   msg("Leyendo leaf post-redistribution.")
   leaf <- as.data.table(read_auto(leaf_path))
